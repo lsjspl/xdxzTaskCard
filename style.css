@@ -944,10 +944,11 @@ body {
 .card-face {
   position: absolute;
   inset: 0;
-  /* overflow: visible to allow character to pop out */
+  overflow: hidden;
   border: 12px solid rgba(255, 255, 255, 0.95);
   border-radius: 26px;
   backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
   box-shadow:
     0 26px 56px rgba(93, 64, 55, 0.18),
     0 0 0 1px rgba(255, 255, 255, 0.35);
@@ -955,13 +956,13 @@ body {
 }
 
 .face-back {
-  z-index: 2;
+  z-index: 1;
   transform: rotateY(0deg); /* Explicitly at 0 for initial view */
   display: grid;
   place-items: center;
   background:
     linear-gradient(145deg, rgba(255, 244, 198, 0.82) 0%, rgba(255, 207, 29, 0.96) 100%),
-    url('img/back.png') center/cover no-repeat;
+    url('card_back.png') center/cover no-repeat;
 }
 
 .face-back::before {
@@ -969,7 +970,7 @@ body {
 }
 
 .face-back::after {
-  content: "Heartopia";
+  content: none;
   position: relative;
   z-index: 2;
   font-family: var(--font-title);
@@ -990,6 +991,7 @@ body {
 .face-front {
   display: flex;
   flex-direction: column;
+  z-index: 2;
   transform: rotateY(180deg); /* Hidden initially behind back */
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 251, 245, 0.98) 100%);
@@ -997,10 +999,12 @@ body {
 
 #card-bg-image {
   position: relative;
+  inset: auto;
   width: 100%;
-  height: 60%;
+  height: 56%;
+  flex: 0 0 56%;
   border-bottom: 8px solid rgba(255, 255, 255, 0.95);
-  background-position: center;
+  background-position: center top;
   background-repeat: no-repeat;
   background-size: cover;
 }
@@ -1015,12 +1019,19 @@ body {
 }
 
 .task-content-wrap {
-  flex: 1;
+  position: relative;
+  left: auto;
+  right: auto;
+  bottom: auto;
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 12px;
-  padding: 20px;
+  padding: 22px 20px 18px;
+  transform: none;
+  z-index: 6;
+  min-height: 0;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(var(--accent-cold), 0.38) 100%);
 }
@@ -1047,6 +1058,7 @@ body {
   color: #ffcd03;
   font-size: 1.5rem;
   letter-spacing: 4px;
+  margin-top: auto;
 }
 
 .theme-easy {

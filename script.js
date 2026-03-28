@@ -22,6 +22,7 @@ const RARITY_THEME = {
     easy: {
         label: '惬意日常',
         stars: '★ ★',
+        card: 'card_easy.png',
         bg: 'img/azure_breeze_bg.png',
         char: 'char_1.png',
         fallbackTask: '去喷泉边散散步',
@@ -30,6 +31,7 @@ const RARITY_THEME = {
     normal: {
         label: '小镇惊喜',
         stars: '★ ★ ★',
+        card: 'card_normal.png',
         bg: 'img/purple_magic_bg.png',
         char: 'char_2.png',
         fallbackTask: '收下一份今天的惊喜',
@@ -38,6 +40,7 @@ const RARITY_THEME = {
     hard: {
         label: '传奇挑战',
         stars: '★ ★ ★ ★',
+        card: 'card_hard.png',
         bg: 'img/amber_sunset_bg.png',
         char: 'char_3.png',
         fallbackTask: '挑战一次传奇任务',
@@ -129,10 +132,10 @@ function applyDestinySkin(destiny) {
     rarityText.textContent = theme.label;
     taskDesc.textContent = destiny.task;
     starsRow.textContent = theme.stars;
-    cardBgImage.style.backgroundImage = `url('${destiny.bg}')`;
+    cardBgImage.style.backgroundImage = `url('${theme.card}')`;
 
     if (charPop) {
-        charPop.style.backgroundImage = `url('${theme.char}')`;
+        charPop.style.backgroundImage = '';
     }
     
     // Reset foil position
