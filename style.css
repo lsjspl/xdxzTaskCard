@@ -50,28 +50,60 @@ body {
   height: 100%;
 }
 
+.card-art-stage {
+  position: relative;
+  flex: 0 0 54%;
+  overflow: visible;
+  isolation: isolate;
+  z-index: 1;
+}
+
 .card-bg-image {
   position: absolute;
   inset: 0;
+  overflow: hidden;
   background-size: cover;
   background-position: center;
-  border-radius: 14px; /* Matches inner padding */
+  border-radius: 14px 14px 0 0;
+  border-bottom: 8px solid rgba(255, 255, 255, 0.95);
+  transform: translate3d(0, 0, 0) scale(1.08);
+  transform-origin: center center;
+  transition: transform 0.18s ease-out, filter 0.18s ease-out;
   z-index: 1;
 }
 
 .card-char-pop {
   position: absolute;
-  bottom: 0;
   left: 50%;
-  width: 140%;
-  height: 120%;
-  transform: translateX(-50%) translateZ(45px); /* Significant depth offset */
+  bottom: -5%;
+  width: 86%;
+  height: 112%;
+  transform: translateX(-50%) translateY(8px) translateZ(96px) scale(1.03);
+  transform-origin: center bottom;
   background-size: contain;
   background-position: center bottom;
   background-repeat: no-repeat;
-  z-index: 5;
+  z-index: 3;
+  opacity: 0.98;
   pointer-events: none;
-  filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.15));
+  transition: transform 0.14s ease-out, filter 0.18s ease-out;
+  filter:
+    drop-shadow(0 22px 32px rgba(28, 18, 18, 0.22))
+    drop-shadow(0 0 18px rgba(255, 255, 255, 0.42));
+}
+
+.card-char-pop::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 10%;
+  width: 56%;
+  height: 11%;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(var(--accent-main), 0.32) 0%, rgba(var(--accent-main), 0.14) 42%, transparent 75%);
+  filter: blur(10px);
+  z-index: -1;
 }
 
 .card-holographic-foil {
@@ -336,16 +368,16 @@ body {
 
 #summon-overlay[data-rarity="easy"],
 #card-reveal-overlay[data-rarity="easy"] {
-  --accent-main: 93, 214, 255;
-  --accent-soft: 174, 239, 255;
-  --accent-cold: 237, 251, 255;
+  --accent-main: 255, 194, 46;
+  --accent-soft: 255, 231, 138;
+  --accent-cold: 255, 248, 216;
 }
 
 #summon-overlay[data-rarity="normal"],
 #card-reveal-overlay[data-rarity="normal"] {
-  --accent-main: 229, 133, 181;
-  --accent-soft: 255, 226, 240;
-  --accent-cold: 255, 245, 250;
+  --accent-main: 255, 194, 46;
+  --accent-soft: 255, 231, 138;
+  --accent-cold: 255, 248, 216;
 }
 
 #summon-overlay[data-rarity="hard"],
@@ -992,21 +1024,14 @@ body {
   display: flex;
   flex-direction: column;
   z-index: 2;
+  overflow: visible;
   transform: rotateY(180deg); /* Hidden initially behind back */
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 251, 245, 0.98) 100%);
 }
 
 #card-bg-image {
-  position: relative;
-  inset: auto;
-  width: 100%;
-  height: 56%;
-  flex: 0 0 56%;
-  border-bottom: 8px solid rgba(255, 255, 255, 0.95);
   background-position: center top;
-  background-repeat: no-repeat;
-  background-size: cover;
 }
 
 #card-bg-image::after {
@@ -1028,7 +1053,7 @@ body {
   flex-direction: column;
   justify-content: flex-start;
   gap: 12px;
-  padding: 22px 20px 18px;
+  padding: 24px 20px 18px;
   transform: none;
   z-index: 6;
   min-height: 0;

@@ -26,7 +26,7 @@ const RARITY_THEME = {
         bg: 'img/azure_breeze_bg.png',
         char: 'char_1.png',
         fallbackTask: '去喷泉边散散步',
-        fx: ['93, 214, 255', '174, 239, 255', '237, 251, 255']
+        fx: ['255, 194, 46', '255, 231, 138', '255, 248, 216']
     },
     normal: {
         label: '小镇惊喜',
@@ -35,7 +35,7 @@ const RARITY_THEME = {
         bg: 'img/purple_magic_bg.png',
         char: 'char_2.png',
         fallbackTask: '收下一份今天的惊喜',
-        fx: ['211, 103, 160', '229, 133, 181', '246, 190, 219']
+        fx: ['255, 194, 46', '255, 231, 138', '255, 248, 216']
     },
     hard: {
         label: '传奇挑战',
@@ -64,6 +64,7 @@ const TIMING = {
 let isSummoning = false;
 let taskData = { easy: [], normal: [], hard: [] };
 let activeTiltPointerId = null;
+let activeTouchId = null;
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const randomChoice = items => items[Math.floor(Math.random() * items.length)];
@@ -132,10 +133,11 @@ function applyDestinySkin(destiny) {
     rarityText.textContent = theme.label;
     taskDesc.textContent = destiny.task;
     starsRow.textContent = theme.stars;
-    cardBgImage.style.backgroundImage = `url('${theme.card}')`;
+    cardBgImage.style.backgroundImage = `url('${destiny.bg}')`;
 
     if (charPop) {
-        charPop.style.backgroundImage = '';
+        charPop.style.backgroundImage = `url('${theme.char}')`;
+        charPop.style.opacity = '1';
     }
     
     // Reset foil position
@@ -149,13 +151,14 @@ function resetCardTilt() {
     const charPop = document.getElementById('card-char-pop');
     
     theCard.style.transform = '';
+    cardBgImage.style.transform = '';
     cardGlare.style.transform = '';
     
     if (foil) {
         foil.style.backgroundPosition = '50% 50%';
     }
     if (charPop) {
-        charPop.style.transform = 'translateX(-50%) translateY(0) translateZ(45px)';
+        charPop.style.transform = 'translateX(-50%) translateY(8px) translateZ(96px) scale(1.03)';
     }
 }
 
@@ -176,7 +179,8 @@ function updateCardTilt(clientX, clientY) {
     const charPop = document.getElementById('card-char-pop');
 
     theCard.style.transition = 'transform 0.1s ease-out, filter 0.18s ease-out';
-    theCard.style.transform = `rotateX(${-dy * 18}deg) rotateY(${dx * 18}deg)`;
+    theCard.style.transform = `rotateX(${-dy * 14}deg) rotateY(${dx * 14}deg)`;
+    cardBgImage.style.transform = `translate3d(${-dx * 18}px, ${-dy * 12}px, 0) scale(1.12)`;
     cardGlare.style.transform = `translate(${dx * 20}px, ${dy * 20}px) rotate(${dx * 5}deg)`;
 
     if (foil) {
@@ -184,7 +188,7 @@ function updateCardTilt(clientX, clientY) {
     }
 
     if (charPop) {
-        charPop.style.transform = `translateX(calc(-50% + ${dx * 32}px)) translateY(${dy * 22}px) translateZ(45px)`;
+        charPop.style.transform = `translateX(calc(-50% + ${dx * 30}px)) translateY(${8 + dy * 14}px) translateZ(96px) rotateX(${-dy * 6}deg) rotateY(${dx * 8}deg) rotateZ(${dx * 4}deg) scale(${1.03 + Math.abs(dx) * 0.03})`;
     }
 }
 
@@ -870,42 +874,77 @@ document.addEventListener('pointermove', event => {
 
 document.addEventListener('pointerup', resetCardTilt);
 document.addEventListener('pointercancel', resetCardTilt);
-cardRevealOverlay.addEventListener('pointerleave', resetCardTilt);
-cardStage.addEventListener('pointerdown', event => {
+cardRevealOverlay.addEventListener('pointerleave', event => {
+    if (event.pointerType !== 'touch') {
+        resetCardTilt();
+    }
+});
+cardRevealOverlay.addEventListener('pointerdown', event => {
     if (!canTiltCard()) return;
 
     if (event.pointerType === 'touch') {
         event.preventDefault();
     }
     activeTiltPointerId = event.pointerId;
-    cardStage.setPointerCapture(event.pointerId);
+    cardRevealOverlay.setPointerCapture(event.pointerId);
     updateCardTilt(event.clientX, event.clientY);
 });
 
-cardStage.addEventListener('pointermove', event => {
+cardRevealOverlay.addEventListener('pointermove', event => {
     if (event.pointerType !== 'touch' || activeTiltPointerId !== event.pointerId) return;
 
     event.preventDefault();
     updateCardTilt(event.clientX, event.clientY);
 });
 
-cardStage.addEventListener('pointerup', event => {
+cardRevealOverlay.addEventListener('pointerup', event => {
     if (activeTiltPointerId === event.pointerId) {
         activeTiltPointerId = null;
     }
-    if (cardStage.hasPointerCapture(event.pointerId)) {
-        cardStage.releasePointerCapture(event.pointerId);
+    if (cardRevealOverlay.hasPointerCapture(event.pointerId)) {
+        cardRevealOverlay.releasePointerCapture(event.pointerId);
     }
 });
 
-cardStage.addEventListener('pointercancel', event => {
+cardRevealOverlay.addEventListener('pointercancel', event => {
     if (activeTiltPointerId === event.pointerId) {
         activeTiltPointerId = null;
     }
-    if (cardStage.hasPointerCapture(event.pointerId)) {
-        cardStage.releasePointerCapture(event.pointerId);
+    if (cardRevealOverlay.hasPointerCapture(event.pointerId)) {
+        cardRevealOverlay.releasePointerCapture(event.pointerId);
     }
 });
+
+cardRevealOverlay.addEventListener('touchstart', event => {
+    if (!canTiltCard() || !event.changedTouches.length) return;
+
+    const touch = event.changedTouches[0];
+    activeTouchId = touch.identifier;
+    event.preventDefault();
+    updateCardTilt(touch.clientX, touch.clientY);
+}, { passive: false });
+
+cardRevealOverlay.addEventListener('touchmove', event => {
+    const touch = Array.from(event.changedTouches).find(item => item.identifier === activeTouchId);
+    if (!touch) return;
+
+    event.preventDefault();
+    updateCardTilt(touch.clientX, touch.clientY);
+}, { passive: false });
+
+cardRevealOverlay.addEventListener('touchend', event => {
+    if (Array.from(event.changedTouches).some(item => item.identifier === activeTouchId)) {
+        activeTouchId = null;
+        resetCardTilt();
+    }
+}, { passive: false });
+
+cardRevealOverlay.addEventListener('touchcancel', event => {
+    if (Array.from(event.changedTouches).some(item => item.identifier === activeTouchId)) {
+        activeTouchId = null;
+        resetCardTilt();
+    }
+}, { passive: false });
 
 window.addEventListener('blur', resetCardTilt);
 window.addEventListener('keydown', event => {
