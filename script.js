@@ -199,10 +199,8 @@ function applyDestinySkin(destiny) {
     rarityText.textContent = theme.label;
     taskDesc.textContent = destiny.task;
     starsRow.textContent = theme.stars;
-    cardBgImage.style.backgroundImage = `
-        linear-gradient(180deg, rgba(255, 250, 243, 0.16) 0%, rgba(255, 242, 228, 0.24) 100%),
-        url("${destiny.bg}")
-    `;
+    cardBgImage.style.backgroundImage = `url("${destiny.bg}")`;
+    cardBgImage.style.backgroundColor = 'rgba(255, 248, 238, 0.92)';
 
     if (charPop) {
         charPop.style.backgroundImage = `url('${theme.char}')`;

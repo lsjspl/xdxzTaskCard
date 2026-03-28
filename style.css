@@ -56,6 +56,9 @@ body {
   overflow: visible;
   isolation: isolate;
   z-index: 1;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
 .card-bg-image {
@@ -67,12 +70,19 @@ body {
   overflow: hidden;
   background-size: cover;
   background-position: center;
+  background-repeat: no-repeat;
   border-radius: 14px;
   border-bottom: none;
   transform: translate3d(0, 0, 0) scale(1.04);
   transform-origin: center center;
   transition: transform 0.18s ease-out, filter 0.18s ease-out;
   z-index: 1;
+  will-change: transform;
+  contain: paint;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  isolation: isolate;
+  outline: 1px solid transparent;
 }
 
 .card-char-pop {
@@ -1046,15 +1056,20 @@ body {
 #card-bg-image {
   background-position: center top;
   box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.28);
+  transform: translate3d(0, 0, 0) translateZ(0.1px) scale(1.04);
 }
 
 #card-bg-image::after {
   content: "";
   position: absolute;
   inset: 0;
+  pointer-events: none;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.16) 0%, transparent 26%, rgba(255, 255, 255, 0.08) 58%, rgba(255, 255, 255, 0.22) 100%),
     radial-gradient(circle at 18% 18%, rgba(255, 255, 255, 0.42) 0%, transparent 22%);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform: translateZ(0);
 }
 
 .task-content-wrap {
