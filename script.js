@@ -7,8 +7,12 @@ const whiteFlash = document.getElementById('white-flash');
 const cardRevealOverlay = document.getElementById('card-reveal-overlay');
 const cardStage = document.getElementById('card-stage');
 const theCard = document.getElementById('the-card');
+const cardInnerWrap = theCard.querySelector('.card-inner-wrap');
+const faceBack = document.querySelector('.face-back');
+const faceFront = document.querySelector('.face-front');
 const cardBgImage = document.getElementById('card-bg-image');
 const cardGlare = document.getElementById('card-glare');
+const taskContentWrap = document.querySelector('.task-content-wrap');
 
 const rarityText = document.getElementById('rarity-text');
 const taskDesc = document.getElementById('task-desc');
@@ -20,7 +24,7 @@ const confettiCanvas = document.getElementById('confetti-canvas');
 
 const RARITY_THEME = {
     easy: {
-        label: '惬意日常',
+        label: '简单',
         stars: '★ ★',
         card: 'card_easy.png',
         bg: 'bg_easy.jpg',
@@ -29,7 +33,7 @@ const RARITY_THEME = {
         fx: ['255, 194, 46', '255, 231, 138', '255, 248, 216']
     },
     normal: {
-        label: '小镇惊喜',
+        label: '普通',
         stars: '★ ★ ★',
         card: 'card_normal.png',
         bg: 'bg_normal.jpg',
@@ -38,7 +42,7 @@ const RARITY_THEME = {
         fx: ['255, 194, 46', '255, 231, 138', '255, 248, 216']
     },
     hard: {
-        label: '传奇挑战',
+        label: '困难',
         stars: '★ ★ ★ ★',
         card: 'card_hard.png',
         bg: 'bg_hard.jpg',
@@ -60,6 +64,8 @@ const TIMING = {
     flip: 1180,
     retry: 900
 };
+
+const FIXED_FX_RARITY = 'hard';
 
 let isSummoning = false;
 let taskData = { easy: [], normal: [], hard: [] };
@@ -156,8 +162,8 @@ async function loadTasks() {
 }
 
 function drawDestiny() {
-    const roll = Math.random() * 100;
-    const rarity = roll < 15 ? 'hard' : roll < 50 ? 'normal' : 'easy';
+    const rarityPool = ['easy', 'normal', 'hard'];
+    const rarity = randomChoice(rarityPool);
     const theme = RARITY_THEME[rarity];
     const pool = taskData[rarity];
 
@@ -168,13 +174,18 @@ function drawDestiny() {
     };
 }
 
+function getFxRarity() {
+    return FIXED_FX_RARITY;
+}
+
 function applyDestinySkin(destiny) {
     const theme = RARITY_THEME[destiny.rarity];
+    const fxRarity = getFxRarity();
     const charPop = document.getElementById('card-char-pop');
     const foil = document.getElementById('card-holographic-foil');
 
-    summonOverlay.dataset.rarity = destiny.rarity;
-    cardRevealOverlay.dataset.rarity = destiny.rarity;
+    summonOverlay.dataset.rarity = fxRarity;
+    cardRevealOverlay.dataset.rarity = fxRarity;
 
     theCard.classList.remove('theme-easy', 'theme-normal', 'theme-hard');
     theCard.classList.add(`theme-${destiny.rarity}`);
@@ -182,13 +193,16 @@ function applyDestinySkin(destiny) {
     rarityText.textContent = theme.label;
     taskDesc.textContent = destiny.task;
     starsRow.textContent = theme.stars;
-    cardBgImage.style.backgroundImage = `url('${destiny.bg}')`;
+    cardBgImage.style.backgroundImage = `
+        linear-gradient(180deg, rgba(255, 250, 243, 0.16) 0%, rgba(255, 242, 228, 0.24) 100%),
+        url("${destiny.bg}")
+    `;
 
     if (charPop) {
         charPop.style.backgroundImage = `url('${theme.char}')`;
         charPop.style.opacity = '1';
     }
-    
+
     // Reset foil position
     if (foil) {
         foil.style.backgroundPosition = '0% 0%';
@@ -200,54 +214,68 @@ function resetCardTilt() {
     const charPop = document.getElementById('card-char-pop');
 
     logTiltDebug('reset/request', { activeTiltPointerId }, { force: true });
-    
-    gsap.to(theCard, { 
-        rotationX: 0, 
-        rotationY: 0, 
-        z: 0, 
-        scale: 1, 
-        duration: 0.8, 
+
+    gsap.to(theCard, {
+        rotationX: 0,
+        rotationY: 0,
+        z: 0,
+        scale: 1,
+        duration: 0.8,
         ease: "power2.out",
         overwrite: "auto"
     });
-    
+
     gsap.to(cardBgImage, { 
         x: 0, 
         y: 0, 
-        scale: 1.08, 
+        z: 0,
+        scale: 1.04, 
         duration: 0.6, 
         ease: "power2.out",
         overwrite: "auto"
     });
-    
-    gsap.to(cardGlare, { 
-        x: 0, 
-        y: 0, 
-        rotate: 0, 
-        duration: 0.6, 
+
+    gsap.to(cardGlare, {
+        x: 0,
+        y: 0,
+        rotate: 0,
+        duration: 0.6,
         ease: "power2.out",
         overwrite: "auto"
     });
-    
+
     if (foil) {
-        gsap.to(foil, { 
-            backgroundPosition: "50% 50%", 
-            duration: 0.6, 
+        gsap.to(foil, {
+            backgroundPosition: "50% 50%",
+            duration: 0.6,
             ease: "power2.out",
             overwrite: "auto"
         });
     }
-    
+
     if (charPop) {
-        gsap.to(charPop, { 
+        gsap.to(charPop, {
             xPercent: -50,
             y: 8,
-            z: 96,
+            z: 112,
             rotateX: 0,
             rotateY: 0,
             rotateZ: 0,
-            scale: 1.03,
+            scale: 1.08,
             duration: 0.6,
+            ease: "power2.out",
+            overwrite: "auto"
+        });
+    }
+
+    if (taskContentWrap) {
+        gsap.to(taskContentWrap, {
+            x: 0,
+            y: 0,
+            z: 0,
+            rotationX: 0,
+            rotationY: 0,
+            duration: 0.55,
             ease: "power2.out",
             overwrite: "auto"
         });
@@ -311,7 +339,8 @@ function updateCardTilt(clientX, clientY) {
     gsap.to(cardBgImage, {
         x: -dx * 25,
         y: -dy * 15,
-        scale: 1.15,
+        z: 0,
+        scale: 1.08,
         duration: 0.5,
         ease: "power1.out",
         overwrite: "auto"
@@ -319,9 +348,9 @@ function updateCardTilt(clientX, clientY) {
 
     // 3. Glare/reflection movement
     gsap.to(cardGlare, {
-        x: dx * 40,
-        y: dy * 40,
-        rotation: dx * 8,
+        x: dx * 26,
+        y: dy * 26,
+        rotation: dx * 5,
         duration: 0.5,
         ease: "power1.out",
         overwrite: "auto"
@@ -330,6 +359,8 @@ function updateCardTilt(clientX, clientY) {
     if (foil) {
         gsap.to(foil, {
             backgroundPosition: `${50 + dx * 25}% ${50 + dy * 25}%`,
+            x: dx * 4,
+            y: dy * 3,
             duration: 0.5,
             ease: "power1.out",
             overwrite: "auto"
@@ -342,12 +373,25 @@ function updateCardTilt(clientX, clientY) {
             xPercent: -50,
             x: dx * 48,
             y: 8 + dy * 22,
-            z: 120,
+            z: 126,
             rotationX: -dy * 8,
             rotationY: dx * 12,
             rotationZ: dx * 3,
-            scale: 1.05 + Math.abs(dx) * 0.03,
+            scale: 1.08 + Math.abs(dx) * 0.03,
             duration: 0.6,
+            ease: "power2.out",
+            overwrite: "auto"
+        });
+    }
+
+    if (taskContentWrap) {
+        gsap.to(taskContentWrap, {
+            x: 0,
+            y: 0,
+            z: 0,
+            rotationX: 0,
+            rotationY: 0,
+            duration: 0.55,
             ease: "power2.out",
             overwrite: "auto"
         });
@@ -382,7 +426,10 @@ function resetRevealScene() {
     theCard.classList.remove('is-flipped');
     resetCardTilt();
     gsap.set([cardRevealOverlay, cardStage, theCard], { clearProps: "all" });
-    gsap.set(retryBtn, { autoAlpha: 0, y: 30 }); 
+    gsap.set(cardInnerWrap, { clearProps: "transform", rotationY: 0 });
+    gsap.set(faceBack, { autoAlpha: 1 });
+    gsap.set(faceFront, { autoAlpha: 1 });
+    gsap.set(retryBtn, { autoAlpha: 0, y: 30 });
     gsap.set(theCard, { rotateX: 0, rotateY: 0, rotateZ: 0, z: 0, scale: 1 });
 }
 
@@ -697,7 +744,7 @@ class SummonFxEngine {
             this.ctx.shadowBlur = 18;
             this.ctx.shadowColor = `rgba(${mote.color},${alpha})`;
             this.ctx.beginPath();
-            this.ctx.rect(mote.x - mote.size/2, mote.y - mote.size/2, mote.size, mote.size);
+            this.ctx.rect(mote.x - mote.size / 2, mote.y - mote.size / 2, mote.size, mote.size);
             this.ctx.fill();
         });
 
@@ -967,7 +1014,7 @@ window.addEventListener('mousemove', event => {
 // Unified Pointer Events for Touch and Mouse Drag
 window.addEventListener('pointerdown', event => {
     if (!canTiltCard()) return;
-    
+
     activeTiltPointerId = event.pointerId;
     logTiltDebug('pointerdown', {
         pointerId: event.pointerId,
@@ -989,7 +1036,7 @@ window.addEventListener('pointermove', event => {
             event.preventDefault();
         }
     }
-    
+
     logTiltDebug('pointermove', {
         pointerId: event.pointerId,
         pointerType: event.pointerType,
@@ -1027,23 +1074,25 @@ async function triggerSummon() {
     isSummoning = true;
     try {
         const destiny = drawDestiny();
+        const fxRarity = getFxRarity();
         const retrying = cardRevealOverlay.classList.contains('active');
         applyDestinySkin(destiny);
         if (retrying) await collapseReveal();
 
         const mainTl = gsap.timeline({ defaults: { ease: "power2.inOut" } });
 
-        mainTl.to(mainScreen, { 
-            opacity: 0, 
-            scale: 0.92, 
-            duration: 0.4, 
+        mainTl.to(mainScreen, {
+            opacity: 0,
+            scale: 0.92,
+            duration: 0.4,
             onStart: () => {
                 clearSummonScene();
                 summonOverlay.classList.add('active');
                 whiteFlash.style.opacity = '0';
-                summonFx.start(destiny.rarity);
+                summonFx.start(fxRarity);
                 // Force reset with standard GSAP properties
                 gsap.set(theCard, { rotationX: 0, rotationY: 0, rotationZ: 0, z: 0, scale: 1 });
+                gsap.set(cardInnerWrap, { rotationY: 0 });
             }
         });
 
@@ -1063,71 +1112,77 @@ async function triggerSummon() {
         mainTl.add(() => {
             summonOverlay.classList.add('phase-tear');
             summonFx.setPhase('tear');
-            summonFx.setIntensity(destiny.rarity === 'hard' ? 6.2 : 3.8);
-            triggerShake(destiny.rarity === 'hard' ? 'heavy' : 'medium');
-            if (destiny.rarity === 'hard') {
+            summonFx.setIntensity(fxRarity === 'hard' ? 6.2 : 3.8);
+            triggerShake(fxRarity === 'hard' ? 'heavy' : 'medium');
+            if (fxRarity === 'hard') {
                 triggerImpactFrame();
                 setTimeout(triggerImpactFrame, 80);
             }
         }).to(summonOverlay, { "--gate-open": "-30vw", duration: 0.38, ease: "expo.in" })
-        .to(whiteFlash, { opacity: 1, duration: 0.08 })
-        .add(() => {
-             if (destiny.rarity === 'hard') triggerImpactFrame();
-             resetRevealScene();
-        });
+            .to(whiteFlash, { opacity: 1, duration: 0.08 })
+            .add(() => {
+                if (fxRarity === 'hard') triggerImpactFrame();
+                resetRevealScene();
+            });
 
         mainTl.set(cardRevealOverlay, { opacity: 1, pointerEvents: "auto" }, "+=0.04")
-          .add(() => {
-              cardRevealOverlay.classList.add('active', 'impacting');
-              cardStage.classList.add('materializing');
-              gsap.set(cardStage, { xPercent: -50, yPercent: -50 });
-              logTiltDebug('reveal/activated', {}, { force: true });
-          })
-          .fromTo(cardStage, 
-              { y: 1200, scale: 0.1, rotateX: 70, opacity: 0, filter: "blur(40px)" },
-              { y: -80, scale: 1.25, rotateX: -18, opacity: 1, filter: "blur(0px)", duration: 0.52, ease: "power4.in" }
-          )
-          .addLabel("slam-moment")
-          .add(() => {
-              triggerShake(destiny.rarity === 'hard' ? 'heavy' : 'medium');
-              summonFx.stop();
-              clearSummonScene();
-          }, "slam-moment")
-          .to(cardStage, { 
-              y: 0, scale: 1, rotateX: 0, duration: 0.75, ease: "elastic.out(1, 0.42)" 
-          }, "slam-moment");
+            .add(() => {
+                cardRevealOverlay.classList.add('active', 'impacting');
+                cardStage.classList.add('materializing');
+                gsap.set(cardStage, { xPercent: -50, yPercent: -50 });
+                logTiltDebug('reveal/activated', {}, { force: true });
+            })
+            .fromTo(cardStage,
+                { y: 1200, scale: 0.1, rotateX: 70, opacity: 0, filter: "blur(40px)" },
+                { y: -80, scale: 1.25, rotateX: -18, opacity: 1, filter: "blur(0px)", duration: 0.52, ease: "power4.in" }
+            )
+            .addLabel("slam-moment")
+            .add(() => {
+                triggerShake(fxRarity === 'hard' ? 'heavy' : 'medium');
+                summonFx.stop();
+                clearSummonScene();
+            }, "slam-moment")
+            .to(cardStage, {
+                y: 0, scale: 1, rotateX: 0, duration: 0.75, ease: "elastic.out(1, 0.42)"
+            }, "slam-moment");
 
         mainTl.to(whiteFlash, { opacity: 0, duration: 0.9 }, "slam-moment+=0.1")
-          .add(() => {
-              cardStage.classList.remove('materializing');
-              cardStage.classList.add('presented');
-              logTiltDebug('reveal/presented', {}, { force: true });
-          })
-          .add(() => revealFx.start(destiny.rarity, cardStage.getBoundingClientRect()))
-          .to({}, {
-              duration: 0.5,
-              onComplete: () => {
-                  cardRevealOverlay.classList.remove('impacting');
-                  logTiltDebug('reveal/impacting-removed', {}, { force: true });
-              }
-          })
-          .addLabel("flip-start", "+=0.3")
-          .to(theCard, { 
-              onStart: () => {
-                  theCard.classList.add('is-flipped');
-                  logTiltDebug('flip/start', {}, { force: true });
-              },
-              z: 130, 
-              scale: 1.05, 
-              duration: 0.85, 
-              ease: "back.out(1.2)" 
-          }, "flip-start")
-          .to(cardGlare, { x: "100%", duration: 1.2, ease: "power2.inOut" }, "flip-start+=0.1")
-          .to(theCard, { 
-              z: 0, scale: 1, duration: 0.5, ease: "elastic.out(1, 0.6)" 
-          }, "-=0.2")
-          .add(() => retryBtn.classList.add('active'), "+=0.1")
-          .to(retryBtn, { autoAlpha: 1, y: 0, duration: 0.5, ease: "power2.out" }, "-=0.2");
+            .add(() => {
+                cardStage.classList.remove('materializing');
+                cardStage.classList.add('presented');
+                logTiltDebug('reveal/presented', {}, { force: true });
+            })
+            .add(() => revealFx.start(fxRarity, cardStage.getBoundingClientRect()))
+            .to({}, {
+                duration: 0.5,
+                onComplete: () => {
+                    cardRevealOverlay.classList.remove('impacting');
+                    logTiltDebug('reveal/impacting-removed', {}, { force: true });
+                }
+            })
+            .addLabel("flip-start", "+=0.3")
+            .add(() => {
+                theCard.classList.add('is-flipped');
+                logTiltDebug('flip/start', {}, { force: true });
+            }, "flip-start")
+            .to(cardInnerWrap, {
+                rotationY: 180,
+                duration: 1.05,
+                ease: "back.out(1.15)",
+                overwrite: "auto"
+            }, "flip-start")
+            .to(theCard, {
+                z: 130,
+                scale: 1.05,
+                duration: 0.85,
+                ease: "back.out(1.2)"
+            }, "flip-start")
+            .to(cardGlare, { x: "100%", duration: 1.2, ease: "power2.inOut" }, "flip-start+=0.1")
+            .to(theCard, {
+                z: 0, scale: 1, duration: 0.5, ease: "elastic.out(1, 0.6)"
+            }, "-=0.2")
+            .add(() => retryBtn.classList.add('active'), "+=0.1")
+            .to(retryBtn, { autoAlpha: 1, y: 0, duration: 0.5, ease: "power2.out" }, "-=0.2");
 
         await mainTl;
     } catch (error) {
