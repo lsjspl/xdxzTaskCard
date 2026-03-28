@@ -84,10 +84,13 @@ const randomRange = (min, max) => Math.random() * (max - min) + min;
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const lerp = (start, end, amount) => start + (end - start) * amount;
 let lastTiltDebugAt = 0;
+let pendingTiltPoint = null;
+let tiltRafId = 0;
+let tiltBoundsCache = null;
+let tiltBoundsCacheAt = 0;
 
 if (typeof window !== 'undefined' && typeof window.__CARD_TILT_DEBUG__ === 'undefined') {
-    window.__CARD_TILT_DEBUG__ = true;
-    console.info('[card-tilt] debug logging enabled. Set window.__CARD_TILT_DEBUG__ = false to silence logs.');
+    window.__CARD_TILT_DEBUG__ = false;
 }
 
 function isTiltDebugEnabled() {
@@ -218,6 +221,11 @@ function resetCardTilt() {
     const charPop = document.getElementById('card-char-pop');
 
     resetGyroBaseline();
+    pendingTiltPoint = null;
+    if (tiltRafId) {
+        cancelAnimationFrame(tiltRafId);
+        tiltRafId = 0;
+    }
     logTiltDebug('reset/request', { activeTiltPointerId }, { force: true });
 
     gsap.to(theCard, {
@@ -289,6 +297,11 @@ function resetCardTilt() {
     requestAnimationFrame(() => {
         logTiltDebug('reset/applied', {}, { force: true });
     });
+}
+
+function clearTiltBoundsCache() {
+    tiltBoundsCache = null;
+    tiltBoundsCacheAt = 0;
 }
 
 function canTiltCard() {
@@ -407,17 +420,24 @@ function applyCardTilt(dx, dy, source = 'pointer', payload = {}) {
 }
 
 function getCardTiltBounds() {
+    const now = performance.now();
+    if (tiltBoundsCache && now - tiltBoundsCacheAt < 80) {
+        return tiltBoundsCache;
+    }
+
     const rect = cardStage.getBoundingClientRect();
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
 
-    return {
+    tiltBoundsCache = {
         rect,
         centerX,
         centerY,
         halfWidth: Math.max(rect.width * 0.72, 180),
         halfHeight: Math.max(rect.height * 0.72, 240)
     };
+    tiltBoundsCacheAt = now;
+    return tiltBoundsCache;
 }
 
 function updateCardTilt(clientX, clientY) {
@@ -436,6 +456,19 @@ function updateCardTilt(clientX, clientY) {
         centerY: roundTiltDebugValue(centerY),
         halfWidth: roundTiltDebugValue(halfWidth),
         halfHeight: roundTiltDebugValue(halfHeight)
+    });
+}
+
+function queueCardTiltUpdate(clientX, clientY) {
+    pendingTiltPoint = { clientX, clientY };
+    if (tiltRafId) return;
+
+    tiltRafId = requestAnimationFrame(() => {
+        tiltRafId = 0;
+        if (!pendingTiltPoint || !canTiltCard()) return;
+        const { clientX: x, clientY: y } = pendingTiltPoint;
+        pendingTiltPoint = null;
+        updateCardTilt(x, y);
     });
 }
 
@@ -844,6 +877,25 @@ class SummonFxEngine {
         this.ctx.arc(centerX, centerY, 320, 0, Math.PI * 2);
         this.ctx.fill();
 
+        if (this.phase === 'charge' || this.phase === 'compress' || this.phase === 'tear') {
+            const phaseEnergy = this.phase === 'charge' ? 0.45 : this.phase === 'compress' ? 0.72 : 0.96;
+            for (let i = 0; i < 3; i += 1) {
+                const ringRadius = 86 + i * 34 + Math.sin(this.phaseTime * 0.04 + i) * 8;
+                const alpha = (0.08 + phaseEnergy * 0.16) * (1 - i * 0.18);
+                this.ctx.save();
+                this.ctx.translate(centerX, centerY);
+                this.ctx.rotate(this.phaseTime * (0.01 + i * 0.004) * (i % 2 === 0 ? 1 : -1));
+                this.ctx.strokeStyle = `rgba(${this.palette[i % this.palette.length]},${alpha})`;
+                this.ctx.lineWidth = 1.4 + i * 0.8;
+                this.ctx.shadowBlur = 20 + i * 8;
+                this.ctx.shadowColor = `rgba(${this.palette[i % this.palette.length]},${alpha})`;
+                this.ctx.beginPath();
+                this.ctx.ellipse(0, 0, ringRadius, ringRadius * 0.58, 0, 0, Math.PI * 2);
+                this.ctx.stroke();
+                this.ctx.restore();
+            }
+        }
+
         this.ambient.forEach(mote => {
             if (this.phase === 'lock') {
                 mote.angle += mote.speed;
@@ -1118,33 +1170,29 @@ mainBg.draw();
 
 // --- Enhanced Event Listeners for 3D Parallax ---
 
-// Use window listeners to keep tracking even if the pointer leaves the overlay
-window.addEventListener('mousemove', event => {
-    if (!canTiltCard()) return;
-    logTiltDebug('mousemove', {
-        clientX: roundTiltDebugValue(event.clientX),
-        clientY: roundTiltDebugValue(event.clientY)
-    });
-    updateCardTilt(event.clientX, event.clientY);
-});
-
-// Unified Pointer Events for Touch and Mouse Drag
+// Unified Pointer Events for Touch, Pen, and Mouse hover/drag
 window.addEventListener('pointerdown', event => {
     if (!canTiltCard()) return;
 
-    activeTiltPointerId = event.pointerId;
+    const isMouse = event.pointerType === 'mouse';
+    activeTiltPointerId = isMouse ? null : event.pointerId;
     resetGyroBaseline();
     logTiltDebug('pointerdown', {
         pointerId: event.pointerId,
         pointerType: event.pointerType,
+        trackAsActive: !isMouse,
         clientX: roundTiltDebugValue(event.clientX),
         clientY: roundTiltDebugValue(event.clientY)
     }, { force: true });
-    updateCardTilt(event.clientX, event.clientY);
+    queueCardTiltUpdate(event.clientX, event.clientY);
 });
 
 window.addEventListener('pointermove', event => {
-    if (activeTiltPointerId !== event.pointerId || !canTiltCard()) return;
+    if (!canTiltCard()) return;
+
+    const isMouse = event.pointerType === 'mouse';
+    const isActivePointer = activeTiltPointerId === event.pointerId;
+    if (!isMouse && !isActivePointer) return;
 
     // Prevent scrolling on mobile during interaction
     if (event.pointerType === 'touch') {
@@ -1161,7 +1209,7 @@ window.addEventListener('pointermove', event => {
         clientX: roundTiltDebugValue(event.clientX),
         clientY: roundTiltDebugValue(event.clientY)
     });
-    updateCardTilt(event.clientX, event.clientY);
+    queueCardTiltUpdate(event.clientX, event.clientY);
 }, { passive: false });
 
 const endPointerInteraction = (event) => {
@@ -1179,6 +1227,8 @@ const endPointerInteraction = (event) => {
 window.addEventListener('pointerup', endPointerInteraction);
 window.addEventListener('pointercancel', endPointerInteraction);
 window.addEventListener('orientationchange', resetGyroBaseline);
+window.addEventListener('resize', clearTiltBoundsCache);
+window.addEventListener('scroll', clearTiltBoundsCache, { passive: true });
 
 // Reset tilt when mouse leaves the viewport entirely
 document.addEventListener('mouseleave', resetCardTilt);
