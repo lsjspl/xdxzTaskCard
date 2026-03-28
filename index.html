@@ -1,15 +1,19 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>心动小镇 · 官方集卡</title>
+    <title>心动小镇任务抽卡</title>
     <meta name="description" content="心动小镇官方风格任务抽卡系统">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@700;900&family=Noto+Sans+SC:wght@300;400;700;900&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@700;900&family=Noto+Sans+SC:wght@300;400;700;900&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
     <canvas id="main-bg-canvas"></canvas>
     <div class="noise-layer"></div>
@@ -20,6 +24,7 @@
     <div class="deco-element deco-d">✦</div>
 
     <main id="main-screen">
+        <div id="home-hero-char" class="home-hero-char"></div>
         <div id="title-container">
             <p class="eyebrow">Heartopia Tasks</p>
             <h1 class="grand-title">心动小镇</h1>
@@ -32,7 +37,7 @@
 
         <button id="summon-btn" class="summon-btn" type="button">
             <span class="btn-core"></span>
-            <span class="btn-text">给我一个任务好了</span>
+            <span class="btn-text">给我一个任务</span>
         </button>
     </main>
 
@@ -71,7 +76,12 @@
                 <div class="card-inner-wrap">
                     <div class="card-face face-back"></div>
                     <div class="card-face face-front">
+                        <div id="card-holographic-foil" class="card-holographic-foil"></div>
                         <div id="card-bg-image" class="card-bg-image"></div>
+                        
+                        <!-- Characters that pop out of the frame -->
+                        <div id="card-char-pop" class="card-char-pop"></div>
+                        
                         <div class="task-content-wrap">
                             <div class="rarity-badge" id="rarity-text">普通</div>
                             <h2 class="task-desc" id="task-desc">正在读取任务...</h2>
@@ -86,6 +96,9 @@
         <button id="retry-btn" class="retry-btn" type="button">再来一次</button>
     </div>
 
+    <!-- GSAP for High-end Animations -->
+    <script src="https://cdn.staticfile.net/gsap/3.12.5/gsap.min.js"></script>
     <script src="script.js"></script>
 </body>
+
 </html>

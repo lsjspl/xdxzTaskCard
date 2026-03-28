@@ -23,6 +23,7 @@ const RARITY_THEME = {
         label: '惬意日常',
         stars: '★ ★',
         bg: 'img/azure_breeze_bg.png',
+        char: 'char_1.png',
         fallbackTask: '去喷泉边散散步',
         fx: ['93, 214, 255', '174, 239, 255', '237, 251, 255']
     },
@@ -30,6 +31,7 @@ const RARITY_THEME = {
         label: '小镇惊喜',
         stars: '★ ★ ★',
         bg: 'img/purple_magic_bg.png',
+        char: 'char_2.png',
         fallbackTask: '收下一份今天的惊喜',
         fx: ['211, 103, 160', '229, 133, 181', '246, 190, 219']
     },
@@ -37,6 +39,7 @@ const RARITY_THEME = {
         label: '传奇挑战',
         stars: '★ ★ ★ ★',
         bg: 'img/amber_sunset_bg.png',
+        char: 'char_3.png',
         fallbackTask: '挑战一次传奇任务',
         fx: ['255, 194, 46', '255, 231, 138', '255, 248, 216']
     }
@@ -113,6 +116,8 @@ function drawDestiny() {
 
 function applyDestinySkin(destiny) {
     const theme = RARITY_THEME[destiny.rarity];
+    const charPop = document.getElementById('card-char-pop');
+    const foil = document.getElementById('card-holographic-foil');
 
     summonOverlay.dataset.rarity = destiny.rarity;
     cardRevealOverlay.dataset.rarity = destiny.rarity;
@@ -124,11 +129,30 @@ function applyDestinySkin(destiny) {
     taskDesc.textContent = destiny.task;
     starsRow.textContent = theme.stars;
     cardBgImage.style.backgroundImage = `url('${destiny.bg}')`;
+
+    if (charPop) {
+        charPop.style.backgroundImage = `url('${theme.char}')`;
+    }
+    
+    // Reset foil position
+    if (foil) {
+        foil.style.backgroundPosition = '0% 0%';
+    }
 }
 
 function resetCardTilt() {
+    const foil = document.getElementById('card-holographic-foil');
+    const charPop = document.getElementById('card-char-pop');
+    
     theCard.style.transform = '';
     cardGlare.style.transform = '';
+    
+    if (foil) {
+        foil.style.backgroundPosition = '50% 50%';
+    }
+    if (charPop) {
+        charPop.style.transform = 'translateX(-50%) translateY(0) translateZ(45px)';
+    }
 }
 
 function clearSummonScene() {
@@ -143,7 +167,31 @@ function resetRevealScene() {
     cardStage.classList.remove('materializing', 'presented');
     theCard.classList.remove('flipped');
     resetCardTilt();
-    document.body.classList.remove('screen-shake-heavy');
+    // 强制重置 3D 旋转和缩放，防止下一次抽卡位置错乱
+    gsap.set([cardRevealOverlay, cardStage, theCard], { clearProps: "all" });
+    gsap.set(retryBtn, { autoAlpha: 0, y: 30 }); // Reset button state
+    gsap.set(theCard, { rotateY: 0, z: 0 });
+}
+
+function collapseReveal() {
+    return new Promise(resolve => {
+        const tl = gsap.timeline({ onComplete: resolve });
+        tl.to(cardStage, { 
+            scale: 0.8, 
+            opacity: 0, 
+            y: 100, 
+            duration: 0.36, 
+            ease: "power2.in" 
+        })
+        .to(cardRevealOverlay, { 
+            opacity: 0, 
+            duration: 0.28 
+        })
+        .add(() => {
+            resetRevealScene();
+            clearSummonScene();
+        });
+    });
 }
 
 function triggerShake(intensity = 'medium') {
@@ -765,9 +813,26 @@ document.addEventListener('pointermove', event => {
     const dx = clamp((event.clientX - centerX) / (rect.width / 2), -1, 1);
     const dy = clamp((event.clientY - centerY) / (rect.height / 2), -1, 1);
 
+    const foil = document.getElementById('card-holographic-foil');
+    const charPop = document.getElementById('card-char-pop');
+
+    // 1. 基座倾斜 (The Base)
     theCard.style.transition = 'transform 0.1s ease-out, filter 0.18s ease-out';
-    theCard.style.transform = `rotateX(${-dy * 20}deg) rotateY(${dx * 20}deg)`;
-    cardGlare.style.transform = `translate(${dx * 25}px, ${dy * 25}px) rotate(${dx * 8}deg)`;
+    theCard.style.transform = `rotateX(${-dy * 18}deg) rotateY(${dx * 18}deg)`;
+    
+    // 2. 扫光层 (Glare)
+    cardGlare.style.transform = `translate(${dx * 20}px, ${dy * 20}px) rotate(${dx * 5}deg)`;
+
+    // 3. 镭射炫彩层视差 (Holographic Shimmer)
+    if (foil) {
+        foil.style.backgroundPosition = `${50 + dx * 20}% ${50 + dy * 20}%`;
+    }
+
+    // 4. 角色出屏视差 (Pop-out Parallax)
+    if (charPop) {
+        // 多倍率位移，产生深度的分离感
+        charPop.style.transform = `translateX(calc(-50% + ${dx * 32}px)) translateY(${dy * 22}px) translateZ(45px)`;
+    }
 });
 
 document.addEventListener('pointerup', resetCardTilt);
@@ -785,92 +850,167 @@ async function triggerSummon() {
     try {
         const destiny = drawDestiny();
         const retrying = cardRevealOverlay.classList.contains('active');
-
         applyDestinySkin(destiny);
 
         if (retrying) {
             await collapseReveal();
-        } else {
-            mainScreen.classList.add('fade-out');
         }
 
-        clearSummonScene();
-        summonOverlay.classList.add('active');
-        whiteFlash.style.transition = 'none';
-        whiteFlash.style.opacity = '0';
-        summonFx.start(destiny.rarity);
+        const mainTl = gsap.timeline({
+            defaults: { ease: "power2.inOut" }
+        });
 
-        await sleep(TIMING.lock);
+        // 1. 首页极速淡出
+        mainTl.to(mainScreen, { 
+            opacity: 0, 
+            scale: 0.92, 
+            duration: 0.4, 
+            onStart: () => {
+                clearSummonScene();
+                summonOverlay.classList.add('active');
+                whiteFlash.style.opacity = '0';
+                summonFx.start(destiny.rarity);
+                // 强制重置卡片初始旋转角度（确保第一帧显示的是卡背）
+                gsap.set(theCard, { rotateY: 0, z: 0 });
+            }
+        });
 
-        summonOverlay.classList.add('phase-charge');
-        summonFx.setPhase('charge');
-        summonFx.setIntensity(1.52);
+        // 2. 蓄力 (Charge)
+        mainTl.add(() => {
+            summonOverlay.classList.add('phase-charge');
+            summonFx.setPhase('charge');
+            summonFx.setIntensity(1.8);
+        })
+        .to(summonOverlay, { 
+            "--gate-open": "48.5vw", 
+            duration: 1.6, 
+            ease: "sine.inOut" 
+        });
 
-        await sleep(TIMING.charge);
+        // 3. 瞬间回缩 (The Recoil / Squeeze)
+        mainTl.add(() => {
+            summonOverlay.classList.add('phase-compress');
+            summonFx.setPhase('compress');
+            summonFx.setIntensity(2.8);
+            triggerShake('light');
+        })
+        .to(summonOverlay, { 
+            "--gate-open": "52vw", 
+            duration: 0.7, 
+            ease: "back.in(4.2)" 
+        });
 
-        summonOverlay.classList.add('phase-compress');
-        summonFx.setPhase('compress');
-        summonFx.setIntensity(2.2);
-        triggerShake('light');
+        // 4. 暴力撕裂 (The Ultimate Burst)
+        mainTl.add(() => {
+            summonOverlay.classList.add('phase-tear');
+            summonFx.setPhase('tear');
+            summonFx.setIntensity(destiny.rarity === 'hard' ? 6.2 : 3.8);
+            triggerShake(destiny.rarity === 'hard' ? 'heavy' : 'medium');
+            if (destiny.rarity === 'hard') {
+                triggerImpactFrame();
+                setTimeout(triggerImpactFrame, 80);
+            }
+        })
+        .to(summonOverlay, { 
+            "--gate-open": "-30vw", 
+            duration: 0.38, 
+            ease: "expo.in" 
+        })
+        .to(whiteFlash, { opacity: 1, duration: 0.08 })
+        .add(() => {
+             if (destiny.rarity === 'hard') triggerImpactFrame();
+             resetRevealScene();
+        });
 
-        await sleep(TIMING.compress);
+        // 5. 陨石砸入 (The Meteor Slam)
+        // 关键修复：使用 xPercent/yPercent 强制忽略 CSS 中的任何 translate 偏移，确保中心对齐
+        mainTl.set(cardRevealOverlay, { opacity: 1, pointerEvents: "auto" }, "+=0.04")
+          .add(() => {
+              cardRevealOverlay.classList.add('active', 'impacting');
+              cardStage.classList.add('materializing');
+              // 强制中心对齐偏移
+              gsap.set(cardStage, { xPercent: -50, yPercent: -50 });
+          })
+          .fromTo(cardStage, 
+              { 
+                  y: 1200, 
+                  scale: 0.1, 
+                  rotateX: 70, 
+                  opacity: 0,
+                  filter: "blur(40px)"
+              },
+              { 
+                  y: -80, 
+                  scale: 1.25, 
+                  rotateX: -18, 
+                  opacity: 1,
+                  filter: "blur(0px)",
+                  duration: 0.52, 
+                  ease: "power4.in" 
+              }
+          )
+          // 落地瞬间的物理反弹和余震
+          .addLabel("slam-moment")
+          .add(() => {
+              triggerShake(destiny.rarity === 'hard' ? 'heavy' : 'medium');
+              summonFx.stop();
+              clearSummonScene();
+          }, "slam-moment")
+          .to(cardStage, { 
+              y: 0, 
+              scale: 1, 
+              rotateX: 0, 
+              duration: 0.75, 
+              ease: "elastic.out(1, 0.42)" 
+          }, "slam-moment");
 
-        summonOverlay.classList.add('phase-tear');
-        summonFx.setPhase('tear');
-        summonFx.setIntensity(destiny.rarity === 'hard' ? 5.0 : 3.2);
+        // 6. 圣光消散与出场
+        mainTl.to(whiteFlash, { opacity: 0, duration: 0.9 }, "slam-moment+=0.1")
+          .set(cardStage, { className: "-=materializing +=presented" })
+          .add(() => revealFx.start(destiny.rarity, cardStage.getBoundingClientRect()))
+          .to(cardRevealOverlay, { className: "-=impacting", duration: 0.5 })
+          
+          // --- 核心翻牌动效: Pop & Reveal ---
+          .addLabel("flip-start", "+=0.3")
+          .to(theCard, { 
+              onStart: () => theCard.classList.add('flipped'),
+              rotateY: 180, // 正向转动 180 度以露出背后的任务面
+              z: 130, 
+              scale: 1.05, 
+              duration: 0.85, 
+              ease: "back.out(1.2)" 
+          }, "flip-start")
+          // 翻转到一半时触发扫光
+          .to(cardGlare, { 
+              x: "100%", 
+              duration: 1.2, 
+              ease: "power2.inOut" 
+          }, "flip-start+=0.1")
+          // 落地回跳
+          .to(theCard, { 
+              z: 0, 
+              scale: 1, 
+              duration: 0.5, 
+              ease: "elastic.out(1, 0.6)" 
+          }, "-=0.2")
 
-        triggerShake(destiny.rarity === 'hard' ? 'heavy' : 'medium');
-        if (destiny.rarity === 'hard') {
-            triggerImpactFrame();
-            setTimeout(triggerImpactFrame, 80);
-        }
+          // --- 按钮稳固显示 ---
+          .add(() => retryBtn.classList.add('active'), "+=0.1")
+          .to(retryBtn, { 
+              autoAlpha: 1, 
+              y: 0, 
+              duration: 0.5, 
+              ease: "power2.out" 
+          }, "-=0.2");
 
-        await sleep(TIMING.tear);
+        await mainTl;
 
-        whiteFlash.style.transition = 'none';
-        whiteFlash.style.opacity = '1';
-
-        if (destiny.rarity === 'hard') {
-            triggerImpactFrame();
-        }
-
-        resetRevealScene();
-
-        await sleep(TIMING.flash);
-
-        cardRevealOverlay.classList.add('active', 'impacting');
-        cardStage.classList.add('materializing');
-
-        await sleep(TIMING.bridgeLead);
-
-        summonFx.stop();
-        clearSummonScene();
-
-        whiteFlash.style.transition = 'opacity 0.95s ease';
-        whiteFlash.style.opacity = '0';
-
-        await sleep(TIMING.revealSettle);
-
-        cardStage.classList.remove('materializing');
-        cardStage.classList.add('presented');
-        revealFx.start(destiny.rarity, cardStage.getBoundingClientRect());
-
-        await sleep(TIMING.impactHold);
-        cardRevealOverlay.classList.remove('impacting');
-
-        await sleep(TIMING.flip);
-
-        theCard.classList.add('flipped');
-
-        await sleep(TIMING.retry);
-        retryBtn.classList.add('active');
     } catch (error) {
-        console.error('出卡流程失败:', error);
+        console.error('终极出卡失败:', error);
         revealFx.stop();
         summonFx.stop();
         clearSummonScene();
-        cardRevealOverlay.classList.remove('active', 'impacting');
-        resetRevealScene();
+        gsap.set([mainScreen, cardRevealOverlay, cardStage, theCard, retryBtn], { clearProps: "all" });
         mainScreen.classList.remove('fade-out');
     } finally {
         isSummoning = false;
