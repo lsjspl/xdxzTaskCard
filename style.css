@@ -218,7 +218,7 @@ body {
   width: calc(100% - 40px);
   height: 88vh;
   transform: translateX(-50%);
-  background: url('char_2.png') center bottom/contain no-repeat;
+  background: url('char_2.webp') center bottom/contain no-repeat;
   z-index: 1;
   pointer-events: none;
   animation: hero-breathe 8s ease-in-out infinite alternate;
@@ -1010,7 +1010,7 @@ body {
   place-items: center;
   background:
     linear-gradient(145deg, rgba(255, 244, 198, 0.82) 0%, rgba(255, 207, 29, 0.96) 100%),
-    url('card_back.png') center/cover no-repeat;
+    url('card_back.webp') center/cover no-repeat;
 }
 
 .face-back::before {

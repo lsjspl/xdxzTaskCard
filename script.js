@@ -26,27 +26,27 @@ const RARITY_THEME = {
     easy: {
         label: '简单',
         stars: '★ ★',
-        card: 'card_easy.png',
+        card: 'card_back.webp',
         bg: 'bg_easy.jpg',
-        char: 'char_1.png',
+        char: 'char_1.webp',
         fallbackTask: '去喷泉边散散步',
         fx: ['255, 194, 46', '255, 231, 138', '255, 248, 216']
     },
     normal: {
         label: '普通',
         stars: '★ ★ ★',
-        card: 'card_normal.png',
+        card: 'card_back.webp',
         bg: 'bg_normal.jpg',
-        char: 'char_2.png',
+        char: 'char_2.webp',
         fallbackTask: '收下一份今天的惊喜',
         fx: ['255, 194, 46', '255, 231, 138', '255, 248, 216']
     },
     hard: {
         label: '困难',
         stars: '★ ★ ★ ★',
-        card: 'card_hard.png',
+        card: 'card_back.webp',
         bg: 'bg_hard.jpg',
-        char: 'char_3.png',
+        char: 'char_3.webp',
         fallbackTask: '挑战一次传奇任务',
         fx: ['255, 194, 46', '255, 231, 138', '255, 248, 216']
     }
