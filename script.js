@@ -877,6 +877,25 @@ class SummonFxEngine {
         this.ctx.arc(centerX, centerY, 320, 0, Math.PI * 2);
         this.ctx.fill();
 
+        if (this.phase === 'charge' || this.phase === 'compress' || this.phase === 'tear') {
+            const phaseEnergy = this.phase === 'charge' ? 0.45 : this.phase === 'compress' ? 0.72 : 0.96;
+            for (let i = 0; i < 3; i += 1) {
+                const ringRadius = 86 + i * 34 + Math.sin(this.phaseTime * 0.04 + i) * 8;
+                const alpha = (0.08 + phaseEnergy * 0.16) * (1 - i * 0.18);
+                this.ctx.save();
+                this.ctx.translate(centerX, centerY);
+                this.ctx.rotate(this.phaseTime * (0.01 + i * 0.004) * (i % 2 === 0 ? 1 : -1));
+                this.ctx.strokeStyle = `rgba(${this.palette[i % this.palette.length]},${alpha})`;
+                this.ctx.lineWidth = 1.4 + i * 0.8;
+                this.ctx.shadowBlur = 20 + i * 8;
+                this.ctx.shadowColor = `rgba(${this.palette[i % this.palette.length]},${alpha})`;
+                this.ctx.beginPath();
+                this.ctx.ellipse(0, 0, ringRadius, ringRadius * 0.58, 0, 0, Math.PI * 2);
+                this.ctx.stroke();
+                this.ctx.restore();
+            }
+        }
+
         this.ambient.forEach(mote => {
             if (this.phase === 'lock') {
                 mote.angle += mote.speed;
