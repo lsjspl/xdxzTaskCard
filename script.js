@@ -83,6 +83,15 @@ const randomChoice = items => items[Math.floor(Math.random() * items.length)];
 const randomRange = (min, max) => Math.random() * (max - min) + min;
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const lerp = (start, end, amount) => start + (end - start) * amount;
+
+function shouldUseLiteFx() {
+    if (typeof window === 'undefined') return false;
+    const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const lowMemoryDevice = typeof navigator !== 'undefined' && Number.isFinite(navigator.deviceMemory) && navigator.deviceMemory <= 4;
+    const lowCpuDevice = typeof navigator !== 'undefined' && Number.isFinite(navigator.hardwareConcurrency) && navigator.hardwareConcurrency <= 4;
+    return Boolean(prefersReducedMotion || lowMemoryDevice || lowCpuDevice);
+}
+
 let lastTiltDebugAt = 0;
 let pendingTiltPoint = null;
 let tiltRafId = 0;
@@ -723,6 +732,7 @@ class SummonFxEngine {
         this.width = window.innerWidth;
         this.height = window.innerHeight;
         this.isMobileViewport = this.width <= 768;
+        this.liteFx = shouldUseLiteFx();
         this.fxVisibilityBoost = this.isMobileViewport ? 1.28 : 1;
     }
 
@@ -756,12 +766,14 @@ class SummonFxEngine {
         this.phase = phase;
         this.phaseTime = 0;
         if (phase === 'charge') {
-            this.seedInward(40);
+            this.seedInward(this.liteFx ? 28 : 40);
         } else if (phase === 'compress') {
-            this.seedInward(90);
+            this.seedInward(this.liteFx ? 64 : 90);
             this.spawnWave(70, 0.2, 2.2);
         } else if (phase === 'tear') {
-            const streakCount = this.palette === RARITY_THEME.hard.fx ? 300 : 180;
+            const streakCount = this.palette === RARITY_THEME.hard.fx
+                ? (this.liteFx ? 180 : 300)
+                : (this.liteFx ? 120 : 180);
             for (let i = 0; i < streakCount; i += 1) this.spawnBurstStreak();
             this.spawnWave(54, 0.75, 5.2);
             this.spawnWave(84, 0.56, 4.3);
@@ -775,7 +787,8 @@ class SummonFxEngine {
     seedAmbient() {
         const centerX = this.width / 2;
         const centerY = this.height / 2;
-        this.ambient = Array.from({ length: 96 }, () => {
+        const ambientCount = this.liteFx ? 58 : 96;
+        this.ambient = Array.from({ length: ambientCount }, () => {
             const angle = Math.random() * Math.PI * 2;
             const radius = randomRange(80, Math.min(this.width, this.height) * 0.42);
             return {
@@ -925,11 +938,14 @@ class SummonFxEngine {
         });
 
         if ((this.phase === 'charge' || this.phase === 'compress') && this.phaseTime % (this.phase === 'compress' ? 1 : 2) === 0) {
-            const count = this.phase === 'compress' ? 7 : 4;
+            const count = this.phase === 'compress'
+                ? (this.liteFx ? 4 : 7)
+                : (this.liteFx ? 2 : 4);
             for (let i = 0; i < count; i += 1) this.spawnInwardShard();
         }
         if (this.phase === 'tear' && this.phaseTime < 20) {
-            for (let i = 0; i < 18; i += 1) this.spawnBurstStreak();
+            const burstCount = this.liteFx ? 10 : 18;
+            for (let i = 0; i < burstCount; i += 1) this.spawnBurstStreak();
         }
 
         this.inward = this.inward.filter(shard => {
