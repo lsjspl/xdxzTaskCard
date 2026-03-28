@@ -845,6 +845,7 @@ body {
   opacity: 0;
   pointer-events: none;
   z-index: 10;
+  touch-action: none;
 }
 
 #reveal-title-wrap {
@@ -910,6 +911,7 @@ body {
   transform-origin: 50% 50%;
   filter: drop-shadow(0 34px 72px rgba(0, 0, 0, 0.42));
   transition: transform 0.18s ease-out, filter 0.18s ease-out;
+  touch-action: none;
 }
 
 #card-stage.materializing #the-card {

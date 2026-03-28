@@ -60,6 +60,7 @@ const TIMING = {
 
 let isSummoning = false;
 let taskData = { easy: [], normal: [], hard: [] };
+let activeTiltPointerId = null;
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const randomChoice = items => items[Math.floor(Math.random() * items.length)];
@@ -155,6 +156,35 @@ function resetCardTilt() {
     }
 }
 
+function canTiltCard() {
+    return cardRevealOverlay.classList.contains('active') && cardStage.classList.contains('presented');
+}
+
+function updateCardTilt(clientX, clientY) {
+    if (!canTiltCard()) return;
+
+    const rect = cardStage.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const dx = clamp((clientX - centerX) / (rect.width / 2), -1, 1);
+    const dy = clamp((clientY - centerY) / (rect.height / 2), -1, 1);
+
+    const foil = document.getElementById('card-holographic-foil');
+    const charPop = document.getElementById('card-char-pop');
+
+    theCard.style.transition = 'transform 0.1s ease-out, filter 0.18s ease-out';
+    theCard.style.transform = `rotateX(${-dy * 18}deg) rotateY(${dx * 18}deg)`;
+    cardGlare.style.transform = `translate(${dx * 20}px, ${dy * 20}px) rotate(${dx * 5}deg)`;
+
+    if (foil) {
+        foil.style.backgroundPosition = `${50 + dx * 20}% ${50 + dy * 20}%`;
+    }
+
+    if (charPop) {
+        charPop.style.transform = `translateX(calc(-50% + ${dx * 32}px)) translateY(${dy * 22}px) translateZ(45px)`;
+    }
+}
+
 function clearSummonScene() {
     summonOverlay.classList.remove('active', 'phase-charge', 'phase-compress', 'phase-tear');
     summonOverlay.style.removeProperty('--gate-open');
@@ -170,7 +200,7 @@ function resetRevealScene() {
     // 强制重置 3D 旋转和缩放，防止下一次抽卡位置错乱
     gsap.set([cardRevealOverlay, cardStage, theCard], { clearProps: "all" });
     gsap.set(retryBtn, { autoAlpha: 0, y: 30 }); // Reset button state
-    gsap.set(theCard, { rotateY: 0, z: 0 });
+    gsap.set(theCard, { rotateX: 0, rotateY: 0, rotateZ: 0, z: 0, scale: 1 });
 }
 
 function collapseReveal() {
@@ -838,6 +868,42 @@ document.addEventListener('pointermove', event => {
 document.addEventListener('pointerup', resetCardTilt);
 document.addEventListener('pointercancel', resetCardTilt);
 cardRevealOverlay.addEventListener('pointerleave', resetCardTilt);
+cardStage.addEventListener('pointerdown', event => {
+    if (!canTiltCard()) return;
+
+    if (event.pointerType === 'touch') {
+        event.preventDefault();
+    }
+    activeTiltPointerId = event.pointerId;
+    cardStage.setPointerCapture(event.pointerId);
+    updateCardTilt(event.clientX, event.clientY);
+});
+
+cardStage.addEventListener('pointermove', event => {
+    if (event.pointerType !== 'touch' || activeTiltPointerId !== event.pointerId) return;
+
+    event.preventDefault();
+    updateCardTilt(event.clientX, event.clientY);
+});
+
+cardStage.addEventListener('pointerup', event => {
+    if (activeTiltPointerId === event.pointerId) {
+        activeTiltPointerId = null;
+    }
+    if (cardStage.hasPointerCapture(event.pointerId)) {
+        cardStage.releasePointerCapture(event.pointerId);
+    }
+});
+
+cardStage.addEventListener('pointercancel', event => {
+    if (activeTiltPointerId === event.pointerId) {
+        activeTiltPointerId = null;
+    }
+    if (cardStage.hasPointerCapture(event.pointerId)) {
+        cardStage.releasePointerCapture(event.pointerId);
+    }
+});
+
 window.addEventListener('blur', resetCardTilt);
 window.addEventListener('keydown', event => {
     if (event.key === 'Escape') closeReveal();
@@ -871,7 +937,7 @@ async function triggerSummon() {
                 whiteFlash.style.opacity = '0';
                 summonFx.start(destiny.rarity);
                 // 强制重置卡片初始旋转角度（确保第一帧显示的是卡背）
-                gsap.set(theCard, { rotateY: 0, z: 0 });
+                gsap.set(theCard, { rotateX: 0, rotateY: 0, rotateZ: 0, z: 0, scale: 1 });
             }
         });
 
@@ -974,7 +1040,7 @@ async function triggerSummon() {
           .addLabel("flip-start", "+=0.3")
           .to(theCard, { 
               onStart: () => theCard.classList.add('flipped'),
-              rotateY: 180, // 正向转动 180 度以露出背后的任务面
+              onComplete: resetCardTilt,
               z: 130, 
               scale: 1.05, 
               duration: 0.85, 
