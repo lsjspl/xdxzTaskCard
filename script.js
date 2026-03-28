@@ -71,6 +71,12 @@ let isSummoning = false;
 let taskData = { easy: [], normal: [], hard: [] };
 let activeTiltPointerId = null;
 let activeTouchId = null;
+let gyroTiltEnabled = false;
+let gyroPermissionRequested = false;
+let gyroPermissionState = 'unknown';
+let gyroListening = false;
+let gyroBaseline = null;
+let gyroFiltered = { dx: 0, dy: 0 };
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const randomChoice = items => items[Math.floor(Math.random() * items.length)];
@@ -213,6 +219,7 @@ function resetCardTilt() {
     const foil = document.getElementById('card-holographic-foil');
     const charPop = document.getElementById('card-char-pop');
 
+    resetGyroBaseline();
     logTiltDebug('reset/request', { activeTiltPointerId }, { force: true });
 
     gsap.to(theCard, {
@@ -290,40 +297,35 @@ function canTiltCard() {
     return cardRevealOverlay.classList.contains('active');
 }
 
-function getCardTiltBounds() {
-    const rect = cardStage.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-
-    return {
-        rect,
-        centerX,
-        centerY,
-        halfWidth: Math.max(rect.width * 0.72, 180),
-        halfHeight: Math.max(rect.height * 0.72, 240)
-    };
+function resetGyroBaseline() {
+    gyroBaseline = null;
+    gyroFiltered = { dx: 0, dy: 0 };
 }
 
-function updateCardTilt(clientX, clientY) {
+function getOrientationAngle() {
+    if (typeof window === 'undefined') return 0;
+    if (window.screen?.orientation && Number.isFinite(window.screen.orientation.angle)) {
+        return window.screen.orientation.angle;
+    }
+    if (typeof window.orientation === 'number') {
+        return window.orientation;
+    }
+    return 0;
+}
+
+function applyCardTilt(dx, dy, source = 'pointer', payload = {}) {
     if (!canTiltCard()) {
-        logTiltDebug('update/skipped-inactive', { clientX, clientY });
+        logTiltDebug('update/skipped-inactive', { source, ...payload });
         return;
     }
 
-    const { rect, centerX, centerY, halfWidth, halfHeight } = getCardTiltBounds();
-    const dx = clamp((clientX - centerX) / halfWidth, -1, 1);
-    const dy = clamp((clientY - centerY) / halfHeight, -1, 1);
-    const targetRotationX = -dy * 15;
-    const targetRotationY = dx * 15;
-
+    const safeDx = clamp(dx, -1, 1);
+    const safeDy = clamp(dy, -1, 1);
+    const targetRotationX = -safeDy * 15;
+    const targetRotationY = safeDx * 15;
     const foil = document.getElementById('card-holographic-foil');
     const charPop = document.getElementById('card-char-pop');
 
-    if (!rect.width || !rect.height) {
-        logTiltDebug('update/zero-bounds', { clientX, clientY }, { force: true });
-    }
-
-    // 1. Target the main card container for 3D rotation
     gsap.to(theCard, {
         rotationX: targetRotationX,
         rotationY: targetRotationY,
@@ -335,10 +337,9 @@ function updateCardTilt(clientX, clientY) {
         overwrite: "auto"
     });
 
-    // 2. Parallax background image (moves opposite to tilt)
     gsap.to(cardBgImage, {
-        x: -dx * 25,
-        y: -dy * 15,
+        x: -safeDx * 25,
+        y: -safeDy * 15,
         z: 0,
         scale: 1.08,
         duration: 0.5,
@@ -346,11 +347,10 @@ function updateCardTilt(clientX, clientY) {
         overwrite: "auto"
     });
 
-    // 3. Glare/reflection movement
     gsap.to(cardGlare, {
-        x: dx * 26,
-        y: dy * 26,
-        rotation: dx * 5,
+        x: safeDx * 26,
+        y: safeDy * 26,
+        rotation: safeDx * 5,
         duration: 0.5,
         ease: "power1.out",
         overwrite: "auto"
@@ -358,9 +358,9 @@ function updateCardTilt(clientX, clientY) {
 
     if (foil) {
         gsap.to(foil, {
-            backgroundPosition: `${50 + dx * 25}% ${50 + dy * 25}%`,
-            x: dx * 4,
-            y: dy * 3,
+            backgroundPosition: `${50 + safeDx * 25}% ${50 + safeDy * 25}%`,
+            x: safeDx * 4,
+            y: safeDy * 3,
             duration: 0.5,
             ease: "power1.out",
             overwrite: "auto"
@@ -368,16 +368,15 @@ function updateCardTilt(clientX, clientY) {
     }
 
     if (charPop) {
-        // Character pops out with enhanced parallax depth
         gsap.to(charPop, {
             xPercent: -50,
-            x: dx * 28,
-            y: 8 + dy * 12,
+            x: safeDx * 28,
+            y: 8 + safeDy * 12,
             z: 126,
-            rotationX: -dy * 3.5,
-            rotationY: dx * 5,
-            rotationZ: dx * 1.2,
-            scale: 1.08 + Math.abs(dx) * 0.015,
+            rotationX: -safeDy * 3.5,
+            rotationY: safeDx * 5,
+            rotationZ: safeDx * 1.2,
+            scale: 1.08 + Math.abs(safeDx) * 0.015,
             duration: 0.6,
             ease: "power2.out",
             overwrite: "auto"
@@ -399,18 +398,138 @@ function updateCardTilt(clientX, clientY) {
 
     requestAnimationFrame(() => {
         logTiltDebug('update/applied', {
-            clientX: roundTiltDebugValue(clientX),
-            clientY: roundTiltDebugValue(clientY),
-            centerX: roundTiltDebugValue(centerX),
-            centerY: roundTiltDebugValue(centerY),
-            halfWidth: roundTiltDebugValue(halfWidth),
-            halfHeight: roundTiltDebugValue(halfHeight),
-            dx: roundTiltDebugValue(dx),
-            dy: roundTiltDebugValue(dy),
+            source,
+            dx: roundTiltDebugValue(safeDx),
+            dy: roundTiltDebugValue(safeDy),
             targetRotationX: roundTiltDebugValue(targetRotationX),
-            targetRotationY: roundTiltDebugValue(targetRotationY)
+            targetRotationY: roundTiltDebugValue(targetRotationY),
+            ...payload
         });
     });
+}
+
+function getCardTiltBounds() {
+    const rect = cardStage.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+
+    return {
+        rect,
+        centerX,
+        centerY,
+        halfWidth: Math.max(rect.width * 0.72, 180),
+        halfHeight: Math.max(rect.height * 0.72, 240)
+    };
+}
+
+function updateCardTilt(clientX, clientY) {
+    const { rect, centerX, centerY, halfWidth, halfHeight } = getCardTiltBounds();
+    const dx = clamp((clientX - centerX) / halfWidth, -1, 1);
+    const dy = clamp((clientY - centerY) / halfHeight, -1, 1);
+
+    if (!rect.width || !rect.height) {
+        logTiltDebug('update/zero-bounds', { clientX, clientY }, { force: true });
+    }
+
+    applyCardTilt(dx, dy, 'pointer', {
+        clientX: roundTiltDebugValue(clientX),
+        clientY: roundTiltDebugValue(clientY),
+        centerX: roundTiltDebugValue(centerX),
+        centerY: roundTiltDebugValue(centerY),
+        halfWidth: roundTiltDebugValue(halfWidth),
+        halfHeight: roundTiltDebugValue(halfHeight)
+    });
+}
+
+function handleGyroOrientation(event) {
+    if (!gyroTiltEnabled || activeTiltPointerId !== null || !canTiltCard()) return;
+    if (!Number.isFinite(event.beta) || !Number.isFinite(event.gamma)) return;
+
+    const angle = getOrientationAngle();
+    const beta = event.beta;
+    const gamma = event.gamma;
+
+    if (!gyroBaseline) {
+        gyroBaseline = { beta, gamma, angle };
+        logTiltDebug('gyro/calibrated', {
+            beta: roundTiltDebugValue(beta),
+            gamma: roundTiltDebugValue(gamma),
+            angle
+        }, { force: true });
+        return;
+    }
+
+    let deltaX = gamma - gyroBaseline.gamma;
+    let deltaY = beta - gyroBaseline.beta;
+
+    if (angle === 90) {
+        deltaX = beta - gyroBaseline.beta;
+        deltaY = -(gamma - gyroBaseline.gamma);
+    } else if (angle === -90 || angle === 270) {
+        deltaX = -(beta - gyroBaseline.beta);
+        deltaY = gamma - gyroBaseline.gamma;
+    } else if (Math.abs(angle) === 180) {
+        deltaX = -(gamma - gyroBaseline.gamma);
+        deltaY = -(beta - gyroBaseline.beta);
+    }
+
+    const targetDx = clamp(deltaX / 18, -1, 1);
+    const targetDy = clamp(deltaY / 22, -1, 1);
+    gyroFiltered.dx = lerp(gyroFiltered.dx, targetDx, 0.22);
+    gyroFiltered.dy = lerp(gyroFiltered.dy, targetDy, 0.22);
+
+    if (Math.abs(gyroFiltered.dx) < 0.02) gyroFiltered.dx = 0;
+    if (Math.abs(gyroFiltered.dy) < 0.02) gyroFiltered.dy = 0;
+
+    applyCardTilt(gyroFiltered.dx, gyroFiltered.dy, 'gyro', {
+        beta: roundTiltDebugValue(beta),
+        gamma: roundTiltDebugValue(gamma),
+        angle
+    });
+}
+
+function startGyroTiltListener() {
+    if (gyroListening || typeof window === 'undefined' || !('DeviceOrientationEvent' in window)) return false;
+    window.addEventListener('deviceorientation', handleGyroOrientation, true);
+    gyroListening = true;
+    gyroTiltEnabled = true;
+    logTiltDebug('gyro/listening', { permission: gyroPermissionState }, { force: true });
+    return true;
+}
+
+async function ensureGyroTiltAccess() {
+    if (typeof window === 'undefined' || !('DeviceOrientationEvent' in window)) return false;
+    if (gyroListening) {
+        gyroTiltEnabled = true;
+        return true;
+    }
+
+    const OrientationEvent = window.DeviceOrientationEvent;
+
+    if (typeof OrientationEvent.requestPermission === 'function') {
+        if (gyroPermissionRequested && gyroPermissionState !== 'granted') {
+            return false;
+        }
+
+        gyroPermissionRequested = true;
+
+        try {
+            gyroPermissionState = await OrientationEvent.requestPermission();
+        } catch (error) {
+            gyroPermissionState = 'denied';
+            console.warn('陀螺仪权限请求失败:', error);
+            return false;
+        }
+
+        if (gyroPermissionState !== 'granted') {
+            logTiltDebug('gyro/permission-denied', { permission: gyroPermissionState }, { force: true });
+            return false;
+        }
+    } else {
+        gyroPermissionState = 'granted';
+    }
+
+    return startGyroTiltListener();
 }
 
 function clearSummonScene() {
@@ -1016,6 +1135,7 @@ window.addEventListener('pointerdown', event => {
     if (!canTiltCard()) return;
 
     activeTiltPointerId = event.pointerId;
+    resetGyroBaseline();
     logTiltDebug('pointerdown', {
         pointerId: event.pointerId,
         pointerType: event.pointerType,
@@ -1053,12 +1173,14 @@ const endPointerInteraction = (event) => {
             pointerType: event.pointerType
         }, { force: true });
         activeTiltPointerId = null;
+        resetGyroBaseline();
         resetCardTilt();
     }
 };
 
 window.addEventListener('pointerup', endPointerInteraction);
 window.addEventListener('pointercancel', endPointerInteraction);
+window.addEventListener('orientationchange', resetGyroBaseline);
 
 // Reset tilt when mouse leaves the viewport entirely
 document.addEventListener('mouseleave', resetCardTilt);
@@ -1073,6 +1195,7 @@ async function triggerSummon() {
     if (isSummoning) return;
     isSummoning = true;
     try {
+        await ensureGyroTiltAccess();
         const destiny = drawDestiny();
         const fxRarity = getFxRarity();
         const retrying = cardRevealOverlay.classList.contains('active');
@@ -1130,6 +1253,7 @@ async function triggerSummon() {
                 cardRevealOverlay.classList.add('active', 'impacting');
                 cardStage.classList.add('materializing');
                 gsap.set(cardStage, { xPercent: -50, yPercent: -50 });
+                resetGyroBaseline();
                 logTiltDebug('reveal/activated', {}, { force: true });
             })
             .fromTo(cardStage,
@@ -1150,6 +1274,7 @@ async function triggerSummon() {
             .add(() => {
                 cardStage.classList.remove('materializing');
                 cardStage.classList.add('presented');
+                resetGyroBaseline();
                 logTiltDebug('reveal/presented', {}, { force: true });
             })
             .add(() => revealFx.start(fxRarity, cardStage.getBoundingClientRect()))
