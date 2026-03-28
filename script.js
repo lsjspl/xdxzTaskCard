@@ -371,13 +371,13 @@ function updateCardTilt(clientX, clientY) {
         // Character pops out with enhanced parallax depth
         gsap.to(charPop, {
             xPercent: -50,
-            x: dx * 48,
-            y: 8 + dy * 22,
+            x: dx * 28,
+            y: 8 + dy * 12,
             z: 126,
-            rotationX: -dy * 8,
-            rotationY: dx * 12,
-            rotationZ: dx * 3,
-            scale: 1.08 + Math.abs(dx) * 0.03,
+            rotationX: -dy * 3.5,
+            rotationY: dx * 5,
+            rotationZ: dx * 1.2,
+            scale: 1.08 + Math.abs(dx) * 0.015,
             duration: 0.6,
             ease: "power2.out",
             overwrite: "auto"
