@@ -23,7 +23,7 @@ const RARITY_THEME = {
         label: '惬意日常',
         stars: '★ ★',
         card: 'card_easy.png',
-        bg: 'img/azure_breeze_bg.png',
+        bg: 'bg_easy.jpg',
         char: 'char_1.png',
         fallbackTask: '去喷泉边散散步',
         fx: ['255, 194, 46', '255, 231, 138', '255, 248, 216']
@@ -32,7 +32,7 @@ const RARITY_THEME = {
         label: '小镇惊喜',
         stars: '★ ★ ★',
         card: 'card_normal.png',
-        bg: 'img/purple_magic_bg.png',
+        bg: 'bg_normal.jpg',
         char: 'char_2.png',
         fallbackTask: '收下一份今天的惊喜',
         fx: ['255, 194, 46', '255, 231, 138', '255, 248, 216']
@@ -41,7 +41,7 @@ const RARITY_THEME = {
         label: '传奇挑战',
         stars: '★ ★ ★ ★',
         card: 'card_hard.png',
-        bg: 'img/amber_sunset_bg.png',
+        bg: 'bg_hard.jpg',
         char: 'char_3.png',
         fallbackTask: '挑战一次传奇任务',
         fx: ['255, 194, 46', '255, 231, 138', '255, 248, 216']
@@ -71,6 +71,55 @@ const randomChoice = items => items[Math.floor(Math.random() * items.length)];
 const randomRange = (min, max) => Math.random() * (max - min) + min;
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const lerp = (start, end, amount) => start + (end - start) * amount;
+let lastTiltDebugAt = 0;
+
+if (typeof window !== 'undefined' && typeof window.__CARD_TILT_DEBUG__ === 'undefined') {
+    window.__CARD_TILT_DEBUG__ = true;
+    console.info('[card-tilt] debug logging enabled. Set window.__CARD_TILT_DEBUG__ = false to silence logs.');
+}
+
+function isTiltDebugEnabled() {
+    return typeof window !== 'undefined' && window.__CARD_TILT_DEBUG__ !== false;
+}
+
+function roundTiltDebugValue(value) {
+    return Number.isFinite(value) ? Number(value.toFixed(2)) : value;
+}
+
+function getTiltDebugSnapshot() {
+    const rect = cardStage.getBoundingClientRect();
+
+    return {
+        overlayActive: cardRevealOverlay.classList.contains('active'),
+        overlayClasses: cardRevealOverlay.className,
+        stageClasses: cardStage.className,
+        cardClasses: theCard.className,
+        stageRect: {
+            left: roundTiltDebugValue(rect.left),
+            top: roundTiltDebugValue(rect.top),
+            width: roundTiltDebugValue(rect.width),
+            height: roundTiltDebugValue(rect.height)
+        },
+        cardRotationX: roundTiltDebugValue(gsap.getProperty(theCard, 'rotationX')),
+        cardRotationY: roundTiltDebugValue(gsap.getProperty(theCard, 'rotationY')),
+        cardZ: roundTiltDebugValue(gsap.getProperty(theCard, 'z')),
+        cardScale: roundTiltDebugValue(gsap.getProperty(theCard, 'scale')),
+        cardTransform: theCard.style.transform || '(empty)'
+    };
+}
+
+function logTiltDebug(label, payload = {}, options = {}) {
+    if (!isTiltDebugEnabled()) return;
+
+    const now = performance.now();
+    if (!options.force && now - lastTiltDebugAt < 120) return;
+
+    lastTiltDebugAt = now;
+    console.log(`[card-tilt] ${label}`, {
+        ...getTiltDebugSnapshot(),
+        ...payload
+    });
+}
 
 function setCanvasSize(canvas, ctx) {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -149,47 +198,175 @@ function applyDestinySkin(destiny) {
 function resetCardTilt() {
     const foil = document.getElementById('card-holographic-foil');
     const charPop = document.getElementById('card-char-pop');
+
+    logTiltDebug('reset/request', { activeTiltPointerId }, { force: true });
     
-    theCard.style.transform = '';
-    cardBgImage.style.transform = '';
-    cardGlare.style.transform = '';
+    gsap.to(theCard, { 
+        rotationX: 0, 
+        rotationY: 0, 
+        z: 0, 
+        scale: 1, 
+        duration: 0.8, 
+        ease: "power2.out",
+        overwrite: "auto"
+    });
+    
+    gsap.to(cardBgImage, { 
+        x: 0, 
+        y: 0, 
+        scale: 1.08, 
+        duration: 0.6, 
+        ease: "power2.out",
+        overwrite: "auto"
+    });
+    
+    gsap.to(cardGlare, { 
+        x: 0, 
+        y: 0, 
+        rotate: 0, 
+        duration: 0.6, 
+        ease: "power2.out",
+        overwrite: "auto"
+    });
     
     if (foil) {
-        foil.style.backgroundPosition = '50% 50%';
+        gsap.to(foil, { 
+            backgroundPosition: "50% 50%", 
+            duration: 0.6, 
+            ease: "power2.out",
+            overwrite: "auto"
+        });
     }
+    
     if (charPop) {
-        charPop.style.transform = 'translateX(-50%) translateY(8px) translateZ(96px) scale(1.03)';
+        gsap.to(charPop, { 
+            xPercent: -50,
+            y: 8,
+            z: 96,
+            rotateX: 0,
+            rotateY: 0,
+            rotateZ: 0,
+            scale: 1.03,
+            duration: 0.6,
+            ease: "power2.out",
+            overwrite: "auto"
+        });
     }
+
+    requestAnimationFrame(() => {
+        logTiltDebug('reset/applied', {}, { force: true });
+    });
 }
 
 function canTiltCard() {
     return cardRevealOverlay.classList.contains('active');
 }
 
-function updateCardTilt(clientX, clientY) {
-    if (!canTiltCard()) return;
-
+function getCardTiltBounds() {
     const rect = cardStage.getBoundingClientRect();
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
-    const dx = clamp((clientX - centerX) / (rect.width / 2), -1, 1);
-    const dy = clamp((clientY - centerY) / (rect.height / 2), -1, 1);
+
+    return {
+        rect,
+        centerX,
+        centerY,
+        halfWidth: Math.max(rect.width * 0.72, 180),
+        halfHeight: Math.max(rect.height * 0.72, 240)
+    };
+}
+
+function updateCardTilt(clientX, clientY) {
+    if (!canTiltCard()) {
+        logTiltDebug('update/skipped-inactive', { clientX, clientY });
+        return;
+    }
+
+    const { rect, centerX, centerY, halfWidth, halfHeight } = getCardTiltBounds();
+    const dx = clamp((clientX - centerX) / halfWidth, -1, 1);
+    const dy = clamp((clientY - centerY) / halfHeight, -1, 1);
+    const targetRotationX = -dy * 15;
+    const targetRotationY = dx * 15;
 
     const foil = document.getElementById('card-holographic-foil');
     const charPop = document.getElementById('card-char-pop');
 
-    theCard.style.transition = 'transform 0.08s ease-out, filter 0.18s ease-out';
-    theCard.style.transform = `perspective(1400px) rotateX(${-dy * 18}deg) rotateY(${dx * 18}deg) translateZ(18px) scale(1.02)`;
-    cardBgImage.style.transform = `translate3d(${-dx * 26}px, ${-dy * 18}px, 0) scale(1.18)`;
-    cardGlare.style.transform = `translate(${dx * 30}px, ${dy * 26}px) rotate(${dx * 8}deg)`;
+    if (!rect.width || !rect.height) {
+        logTiltDebug('update/zero-bounds', { clientX, clientY }, { force: true });
+    }
+
+    // 1. Target the main card container for 3D rotation
+    gsap.to(theCard, {
+        rotationX: targetRotationX,
+        rotationY: targetRotationY,
+        z: 20,
+        scale: 1.01,
+        transformPerspective: 1200,
+        duration: 0.4,
+        ease: "power1.out",
+        overwrite: "auto"
+    });
+
+    // 2. Parallax background image (moves opposite to tilt)
+    gsap.to(cardBgImage, {
+        x: -dx * 25,
+        y: -dy * 15,
+        scale: 1.15,
+        duration: 0.5,
+        ease: "power1.out",
+        overwrite: "auto"
+    });
+
+    // 3. Glare/reflection movement
+    gsap.to(cardGlare, {
+        x: dx * 40,
+        y: dy * 40,
+        rotation: dx * 8,
+        duration: 0.5,
+        ease: "power1.out",
+        overwrite: "auto"
+    });
 
     if (foil) {
-        foil.style.backgroundPosition = `${50 + dx * 20}% ${50 + dy * 20}%`;
+        gsap.to(foil, {
+            backgroundPosition: `${50 + dx * 25}% ${50 + dy * 25}%`,
+            duration: 0.5,
+            ease: "power1.out",
+            overwrite: "auto"
+        });
     }
 
     if (charPop) {
-        charPop.style.transform = `translateX(calc(-50% + ${dx * 40}px)) translateY(${8 + dy * 18}px) translateZ(118px) rotateX(${-dy * 8}deg) rotateY(${dx * 11}deg) rotateZ(${dx * 5}deg) scale(${1.05 + Math.abs(dx) * 0.05})`;
+        // Character pops out with enhanced parallax depth
+        gsap.to(charPop, {
+            xPercent: -50,
+            x: dx * 48,
+            y: 8 + dy * 22,
+            z: 120,
+            rotationX: -dy * 8,
+            rotationY: dx * 12,
+            rotationZ: dx * 3,
+            scale: 1.05 + Math.abs(dx) * 0.03,
+            duration: 0.6,
+            ease: "power2.out",
+            overwrite: "auto"
+        });
     }
+
+    requestAnimationFrame(() => {
+        logTiltDebug('update/applied', {
+            clientX: roundTiltDebugValue(clientX),
+            clientY: roundTiltDebugValue(clientY),
+            centerX: roundTiltDebugValue(centerX),
+            centerY: roundTiltDebugValue(centerY),
+            halfWidth: roundTiltDebugValue(halfWidth),
+            halfHeight: roundTiltDebugValue(halfHeight),
+            dx: roundTiltDebugValue(dx),
+            dy: roundTiltDebugValue(dy),
+            targetRotationX: roundTiltDebugValue(targetRotationX),
+            targetRotationY: roundTiltDebugValue(targetRotationY)
+        });
+    });
 }
 
 function clearSummonScene() {
@@ -202,33 +379,11 @@ function resetRevealScene() {
     revealFx.stop();
     cardRevealOverlay.classList.remove('impacting');
     cardStage.classList.remove('materializing', 'presented');
-    theCard.classList.remove('flipped');
+    theCard.classList.remove('is-flipped');
     resetCardTilt();
-    // 强制重置 3D 旋转和缩放，防止下一次抽卡位置错乱
     gsap.set([cardRevealOverlay, cardStage, theCard], { clearProps: "all" });
-    gsap.set(retryBtn, { autoAlpha: 0, y: 30 }); // Reset button state
+    gsap.set(retryBtn, { autoAlpha: 0, y: 30 }); 
     gsap.set(theCard, { rotateX: 0, rotateY: 0, rotateZ: 0, z: 0, scale: 1 });
-}
-
-function collapseReveal() {
-    return new Promise(resolve => {
-        const tl = gsap.timeline({ onComplete: resolve });
-        tl.to(cardStage, { 
-            scale: 0.8, 
-            opacity: 0, 
-            y: 100, 
-            duration: 0.36, 
-            ease: "power2.in" 
-        })
-        .to(cardRevealOverlay, { 
-            opacity: 0, 
-            duration: 0.28 
-        })
-        .add(() => {
-            resetRevealScene();
-            clearSummonScene();
-        });
-    });
 }
 
 function triggerShake(intensity = 'medium') {
@@ -262,10 +417,8 @@ async function collapseReveal() {
 
 function closeReveal() {
     if (isSummoning || !cardRevealOverlay.classList.contains('active')) return;
-
     resetRevealScene();
     cardRevealOverlay.classList.remove('active');
-
     setTimeout(() => {
         mainScreen.classList.remove('fade-out');
     }, 260);
@@ -312,11 +465,9 @@ class BackgroundEngine {
 
     draw = () => {
         this.ctx.clearRect(0, 0, this.width, this.height);
-
         this.orbs.forEach(orb => {
             orb.x += orb.driftX;
             orb.y += orb.driftY;
-
             if (orb.x < -orb.radius) orb.x = this.width + orb.radius;
             if (orb.x > this.width + orb.radius) orb.x = -orb.radius;
             if (orb.y < -orb.radius) orb.y = this.height + orb.radius;
@@ -324,7 +475,6 @@ class BackgroundEngine {
             const gradient = this.ctx.createRadialGradient(orb.x, orb.y, 0, orb.x, orb.y, orb.radius);
             gradient.addColorStop(0, `rgba(255,190,120,${orb.alpha})`);
             gradient.addColorStop(1, 'rgba(255,190,120,0)');
-
             this.ctx.fillStyle = gradient;
             this.ctx.beginPath();
             this.ctx.arc(orb.x, orb.y, orb.radius, 0, Math.PI * 2);
@@ -337,7 +487,6 @@ class BackgroundEngine {
                 line.y = -line.length;
                 line.x = Math.random() * this.width;
             }
-
             const gradient = this.ctx.createLinearGradient(line.x, line.y - line.length, line.x, line.y);
             gradient.addColorStop(0, 'rgba(255,255,255,0)');
             gradient.addColorStop(1, `rgba(255,220,180,${line.alpha})`);
@@ -348,7 +497,6 @@ class BackgroundEngine {
             this.ctx.lineTo(line.x, line.y);
             this.ctx.stroke();
         });
-
         requestAnimationFrame(this.draw);
     };
 }
@@ -406,7 +554,6 @@ class SummonFxEngine {
         if (phase === this.phase) return;
         this.phase = phase;
         this.phaseTime = 0;
-
         if (phase === 'charge') {
             this.seedInward(40);
         } else if (phase === 'compress') {
@@ -427,7 +574,6 @@ class SummonFxEngine {
     seedAmbient() {
         const centerX = this.width / 2;
         const centerY = this.height / 2;
-
         this.ambient = Array.from({ length: 96 }, () => {
             const angle = Math.random() * Math.PI * 2;
             const radius = randomRange(80, Math.min(this.width, this.height) * 0.42);
@@ -447,7 +593,6 @@ class SummonFxEngine {
     randomEdgePoint() {
         const margin = 90;
         const side = Math.floor(Math.random() * 4);
-
         if (side === 0) return { x: randomRange(-margin, this.width + margin), y: -margin };
         if (side === 1) return { x: this.width + margin, y: randomRange(-margin, this.height + margin) };
         if (side === 2) return { x: randomRange(-margin, this.width + margin), y: this.height + margin };
@@ -491,7 +636,6 @@ class SummonFxEngine {
         const centerY = this.height / 2;
         const angle = Math.random() * Math.PI * 2;
         const speed = randomRange(8, 22) * this.intensity;
-
         this.burst.push({
             x: centerX + Math.cos(angle) * randomRange(0, 16),
             y: centerY + Math.sin(angle) * randomRange(0, 16),
@@ -518,7 +662,6 @@ class SummonFxEngine {
 
     animate = () => {
         if (!this.active) return;
-
         const centerX = this.width / 2;
         const centerY = this.height / 2;
         this.phaseTime += 1;
@@ -547,10 +690,8 @@ class SummonFxEngine {
             } else {
                 mote.radius += 7;
             }
-
             mote.x = centerX + Math.cos(mote.angle) * mote.radius;
             mote.y = centerY + Math.sin(mote.angle) * mote.radius;
-
             const alpha = mote.alpha * (this.phase === 'tear' ? 0.34 : 0.76);
             this.ctx.fillStyle = `rgba(${mote.color},${alpha})`;
             this.ctx.shadowBlur = 18;
@@ -564,7 +705,6 @@ class SummonFxEngine {
             const count = this.phase === 'compress' ? 7 : 4;
             for (let i = 0; i < count; i += 1) this.spawnInwardShard();
         }
-
         if (this.phase === 'tear' && this.phaseTime < 20) {
             for (let i = 0; i < 18; i += 1) this.spawnBurstStreak();
         }
@@ -576,13 +716,11 @@ class SummonFxEngine {
             const speedBoost = this.phase === 'compress' ? 1.5 : 1;
             shard.x += shard.vx * shard.speed * speedBoost;
             shard.y += shard.vy * shard.speed * speedBoost;
-
             const dx = shard.tx - shard.x;
             const dy = shard.ty - shard.y;
             const dist = Math.hypot(dx, dy);
             const lifeProgress = shard.age / shard.life;
             const alpha = shard.alpha * (1 - lifeProgress);
-
             this.ctx.strokeStyle = `rgba(${shard.color},${alpha})`;
             this.ctx.lineWidth = shard.size;
             this.ctx.lineCap = 'round';
@@ -592,7 +730,6 @@ class SummonFxEngine {
             this.ctx.moveTo(shard.px, shard.py);
             this.ctx.lineTo(shard.x, shard.y);
             this.ctx.stroke();
-
             return dist > 16 && lifeProgress < 1;
         });
 
@@ -608,7 +745,6 @@ class SummonFxEngine {
             const tailY = streak.y - streak.vy * 0.9;
             const headX = streak.x + streak.vx * 0.18;
             const headY = streak.y + streak.vy * 0.18;
-
             this.ctx.strokeStyle = `rgba(${streak.color},${alpha})`;
             this.ctx.lineWidth = streak.width * (1 - lifeProgress * 0.42);
             this.ctx.lineCap = 'round';
@@ -618,28 +754,24 @@ class SummonFxEngine {
             this.ctx.moveTo(tailX, tailY);
             this.ctx.lineTo(headX, headY);
             this.ctx.stroke();
-
             return lifeProgress < 1;
         });
 
         this.waves = this.waves.filter(wave => {
             wave.radius += wave.speed;
             wave.alpha *= 0.95;
-
             this.ctx.strokeStyle = `rgba(${wave.color},${wave.alpha})`;
             this.ctx.lineWidth = wave.width;
             this.ctx.save();
             this.ctx.translate(centerX, centerY);
-            this.ctx.rotate(Math.PI / 4); // Diamond rotation
+            this.ctx.rotate(Math.PI / 4);
             this.ctx.beginPath();
             const r = wave.radius;
             this.ctx.rect(-r, -r, r * 2, r * 2);
             this.ctx.stroke();
             this.ctx.restore();
-
             return wave.alpha > 0.02;
         });
-
         this.ctx.restore();
         this.rafId = requestAnimationFrame(this.animate);
     };
@@ -732,25 +864,13 @@ class RevealFxEngine {
 
     animate = () => {
         if (!this.active) return;
-
         this.time += 1;
         this.ctx.clearRect(0, 0, this.width, this.height);
         this.ctx.save();
         this.ctx.globalCompositeOperation = 'screen';
-
-        const aura = this.ctx.createRadialGradient(this.anchor.x, this.anchor.y, 0, this.anchor.x, this.anchor.y, 320);
-        aura.addColorStop(0, `rgba(${this.palette[1]},0.24)`);
-        aura.addColorStop(0.42, `rgba(${this.palette[0]},0.12)`);
-        aura.addColorStop(1, 'rgba(255,255,255,0)');
-        this.ctx.fillStyle = aura;
-        this.ctx.beginPath();
-        this.ctx.arc(this.anchor.x, this.anchor.y, 320, 0, Math.PI * 2);
-        this.ctx.fill();
-
         this.rings = this.rings.filter(ring => {
             ring.radius += ring.speed;
             ring.alpha *= 0.97;
-
             this.ctx.strokeStyle = `rgba(${ring.color},${ring.alpha})`;
             this.ctx.lineWidth = ring.width;
             this.ctx.save();
@@ -761,7 +881,6 @@ class RevealFxEngine {
             this.ctx.rect(-r, -r, r * 2, r * 2);
             this.ctx.stroke();
             this.ctx.restore();
-
             return ring.alpha > 0.02;
         });
 
@@ -770,7 +889,6 @@ class RevealFxEngine {
             const x = this.anchor.x + Math.cos(sparkle.angle) * sparkle.radius;
             const y = this.anchor.y + Math.sin(sparkle.angle) * sparkle.radius * 0.72;
             const alpha = sparkle.alpha * (0.6 + Math.sin(this.time * 0.06 + sparkle.angle) * 0.4);
-
             this.ctx.fillStyle = `rgba(${sparkle.color},${alpha})`;
             this.ctx.shadowBlur = 16;
             this.ctx.shadowColor = `rgba(${sparkle.color},${alpha})`;
@@ -783,11 +901,9 @@ class RevealFxEngine {
             const burstCount = this.time < 20 ? 8 : 4;
             for (let i = 0; i < burstCount; i += 1) this.spawnTrail();
         }
-
         if ((this.time < 160 && this.time % 2 === 0) || (this.time < 320 && this.time % 6 === 0)) {
             this.spawnEmber();
         }
-
         this.trails = this.trails.filter(trail => {
             trail.age += 1;
             trail.x += trail.vx;
@@ -798,7 +914,6 @@ class RevealFxEngine {
             const alpha = trail.alpha * (1 - lifeProgress);
             const tailX = trail.x - trail.vx;
             const tailY = trail.y - trail.vy;
-
             this.ctx.strokeStyle = `rgba(${trail.color},${alpha})`;
             this.ctx.lineWidth = trail.width * (1 - lifeProgress * 0.32);
             this.ctx.lineCap = 'round';
@@ -808,7 +923,6 @@ class RevealFxEngine {
             this.ctx.moveTo(tailX, tailY);
             this.ctx.lineTo(trail.x, trail.y);
             this.ctx.stroke();
-
             return lifeProgress < 1;
         });
 
@@ -819,17 +933,14 @@ class RevealFxEngine {
             ember.vy += 0.02;
             const lifeProgress = ember.age / ember.life;
             const alpha = ember.alpha * (1 - lifeProgress);
-
             this.ctx.fillStyle = `rgba(${ember.color},${alpha})`;
             this.ctx.shadowBlur = 12;
             this.ctx.shadowColor = `rgba(${ember.color},${alpha})`;
             this.ctx.beginPath();
             this.ctx.arc(ember.x, ember.y, ember.size, 0, Math.PI * 2);
             this.ctx.fill();
-
             return lifeProgress < 1;
         });
-
         this.ctx.restore();
         this.rafId = requestAnimationFrame(this.animate);
     };
@@ -841,123 +952,70 @@ const revealFx = new RevealFxEngine(confettiCanvas);
 
 mainBg.draw();
 
-cardRevealOverlay.addEventListener('mousemove', event => {
+// --- Enhanced Event Listeners for 3D Parallax ---
+
+// Use window listeners to keep tracking even if the pointer leaves the overlay
+window.addEventListener('mousemove', event => {
     if (!canTiltCard()) return;
+    logTiltDebug('mousemove', {
+        clientX: roundTiltDebugValue(event.clientX),
+        clientY: roundTiltDebugValue(event.clientY)
+    });
     updateCardTilt(event.clientX, event.clientY);
 });
 
-cardRevealOverlay.addEventListener('mousedown', event => {
+// Unified Pointer Events for Touch and Mouse Drag
+window.addEventListener('pointerdown', event => {
     if (!canTiltCard()) return;
-    updateCardTilt(event.clientX, event.clientY);
-});
-
-document.addEventListener('pointermove', event => {
-    if (!canTiltCard() || event.pointerType === 'touch') return;
-    updateCardTilt(event.clientX, event.clientY);
-    return;
-
-    const rect = cardStage.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-    const dx = clamp((event.clientX - centerX) / (rect.width / 2), -1, 1);
-    const dy = clamp((event.clientY - centerY) / (rect.height / 2), -1, 1);
-
-    const foil = document.getElementById('card-holographic-foil');
-    const charPop = document.getElementById('card-char-pop');
-
-    // 1. 基座倾斜 (The Base)
-    theCard.style.transition = 'transform 0.1s ease-out, filter 0.18s ease-out';
-    theCard.style.transform = `rotateX(${-dy * 18}deg) rotateY(${dx * 18}deg)`;
     
-    // 2. 扫光层 (Glare)
-    cardGlare.style.transform = `translate(${dx * 20}px, ${dy * 20}px) rotate(${dx * 5}deg)`;
-
-    // 3. 镭射炫彩层视差 (Holographic Shimmer)
-    if (foil) {
-        foil.style.backgroundPosition = `${50 + dx * 20}% ${50 + dy * 20}%`;
-    }
-
-    // 4. 角色出屏视差 (Pop-out Parallax)
-    if (charPop) {
-        // 多倍率位移，产生深度的分离感
-        charPop.style.transform = `translateX(calc(-50% + ${dx * 32}px)) translateY(${dy * 22}px) translateZ(45px)`;
-    }
-});
-
-document.addEventListener('pointerup', resetCardTilt);
-document.addEventListener('pointercancel', resetCardTilt);
-cardRevealOverlay.addEventListener('pointerleave', event => {
-    if (event.pointerType !== 'touch') {
-        resetCardTilt();
-    }
-});
-cardRevealOverlay.addEventListener('mouseleave', resetCardTilt);
-cardRevealOverlay.addEventListener('pointerdown', event => {
-    if (!canTiltCard()) return;
-
-    if (event.pointerType === 'touch') {
-        event.preventDefault();
-    }
     activeTiltPointerId = event.pointerId;
-    cardRevealOverlay.setPointerCapture(event.pointerId);
+    logTiltDebug('pointerdown', {
+        pointerId: event.pointerId,
+        pointerType: event.pointerType,
+        clientX: roundTiltDebugValue(event.clientX),
+        clientY: roundTiltDebugValue(event.clientY)
+    }, { force: true });
     updateCardTilt(event.clientX, event.clientY);
 });
 
-cardRevealOverlay.addEventListener('pointermove', event => {
-    if (event.pointerType !== 'touch' || activeTiltPointerId !== event.pointerId) return;
+window.addEventListener('pointermove', event => {
+    if (activeTiltPointerId !== event.pointerId || !canTiltCard()) return;
 
-    event.preventDefault();
+    // Prevent scrolling on mobile during interaction
+    if (event.pointerType === 'touch') {
+        const target = event.target;
+        // Only prevent default if interacting with the card area to preserve UI scrolling if any
+        if (cardRevealOverlay.contains(target)) {
+            event.preventDefault();
+        }
+    }
+    
+    logTiltDebug('pointermove', {
+        pointerId: event.pointerId,
+        pointerType: event.pointerType,
+        clientX: roundTiltDebugValue(event.clientX),
+        clientY: roundTiltDebugValue(event.clientY)
+    });
     updateCardTilt(event.clientX, event.clientY);
-});
-
-cardRevealOverlay.addEventListener('pointerup', event => {
-    if (activeTiltPointerId === event.pointerId) {
-        activeTiltPointerId = null;
-    }
-    if (cardRevealOverlay.hasPointerCapture(event.pointerId)) {
-        cardRevealOverlay.releasePointerCapture(event.pointerId);
-    }
-});
-
-cardRevealOverlay.addEventListener('pointercancel', event => {
-    if (activeTiltPointerId === event.pointerId) {
-        activeTiltPointerId = null;
-    }
-    if (cardRevealOverlay.hasPointerCapture(event.pointerId)) {
-        cardRevealOverlay.releasePointerCapture(event.pointerId);
-    }
-});
-
-cardRevealOverlay.addEventListener('touchstart', event => {
-    if (!canTiltCard() || !event.changedTouches.length) return;
-
-    const touch = event.changedTouches[0];
-    activeTouchId = touch.identifier;
-    event.preventDefault();
-    updateCardTilt(touch.clientX, touch.clientY);
 }, { passive: false });
 
-cardRevealOverlay.addEventListener('touchmove', event => {
-    const touch = Array.from(event.changedTouches).find(item => item.identifier === activeTouchId);
-    if (!touch) return;
-
-    event.preventDefault();
-    updateCardTilt(touch.clientX, touch.clientY);
-}, { passive: false });
-
-cardRevealOverlay.addEventListener('touchend', event => {
-    if (Array.from(event.changedTouches).some(item => item.identifier === activeTouchId)) {
-        activeTouchId = null;
+const endPointerInteraction = (event) => {
+    if (activeTiltPointerId === event.pointerId) {
+        logTiltDebug('pointerend', {
+            pointerId: event.pointerId,
+            pointerType: event.pointerType
+        }, { force: true });
+        activeTiltPointerId = null;
         resetCardTilt();
     }
-}, { passive: false });
+};
 
-cardRevealOverlay.addEventListener('touchcancel', event => {
-    if (Array.from(event.changedTouches).some(item => item.identifier === activeTouchId)) {
-        activeTouchId = null;
-        resetCardTilt();
-    }
-}, { passive: false });
+window.addEventListener('pointerup', endPointerInteraction);
+window.addEventListener('pointercancel', endPointerInteraction);
+
+// Reset tilt when mouse leaves the viewport entirely
+document.addEventListener('mouseleave', resetCardTilt);
+cardRevealOverlay.addEventListener('mouseleave', resetCardTilt);
 
 window.addEventListener('blur', resetCardTilt);
 window.addEventListener('keydown', event => {
@@ -967,21 +1025,14 @@ window.addEventListener('keydown', event => {
 async function triggerSummon() {
     if (isSummoning) return;
     isSummoning = true;
-
     try {
         const destiny = drawDestiny();
         const retrying = cardRevealOverlay.classList.contains('active');
         applyDestinySkin(destiny);
+        if (retrying) await collapseReveal();
 
-        if (retrying) {
-            await collapseReveal();
-        }
+        const mainTl = gsap.timeline({ defaults: { ease: "power2.inOut" } });
 
-        const mainTl = gsap.timeline({
-            defaults: { ease: "power2.inOut" }
-        });
-
-        // 1. 首页极速淡出
         mainTl.to(mainScreen, { 
             opacity: 0, 
             scale: 0.92, 
@@ -991,37 +1042,24 @@ async function triggerSummon() {
                 summonOverlay.classList.add('active');
                 whiteFlash.style.opacity = '0';
                 summonFx.start(destiny.rarity);
-                // 强制重置卡片初始旋转角度（确保第一帧显示的是卡背）
-                gsap.set(theCard, { rotateX: 0, rotateY: 0, rotateZ: 0, z: 0, scale: 1 });
+                // Force reset with standard GSAP properties
+                gsap.set(theCard, { rotationX: 0, rotationY: 0, rotationZ: 0, z: 0, scale: 1 });
             }
         });
 
-        // 2. 蓄力 (Charge)
         mainTl.add(() => {
             summonOverlay.classList.add('phase-charge');
             summonFx.setPhase('charge');
             summonFx.setIntensity(1.8);
-        })
-        .to(summonOverlay, { 
-            "--gate-open": "48.5vw", 
-            duration: 1.6, 
-            ease: "sine.inOut" 
-        });
+        }).to(summonOverlay, { "--gate-open": "48.5vw", duration: 1.6, ease: "sine.inOut" });
 
-        // 3. 瞬间回缩 (The Recoil / Squeeze)
         mainTl.add(() => {
             summonOverlay.classList.add('phase-compress');
             summonFx.setPhase('compress');
             summonFx.setIntensity(2.8);
             triggerShake('light');
-        })
-        .to(summonOverlay, { 
-            "--gate-open": "52vw", 
-            duration: 0.7, 
-            ease: "back.in(4.2)" 
-        });
+        }).to(summonOverlay, { "--gate-open": "52vw", duration: 0.7, ease: "back.in(4.2)" });
 
-        // 4. 暴力撕裂 (The Ultimate Burst)
         mainTl.add(() => {
             summonOverlay.classList.add('phase-tear');
             summonFx.setPhase('tear');
@@ -1031,46 +1069,24 @@ async function triggerSummon() {
                 triggerImpactFrame();
                 setTimeout(triggerImpactFrame, 80);
             }
-        })
-        .to(summonOverlay, { 
-            "--gate-open": "-30vw", 
-            duration: 0.38, 
-            ease: "expo.in" 
-        })
+        }).to(summonOverlay, { "--gate-open": "-30vw", duration: 0.38, ease: "expo.in" })
         .to(whiteFlash, { opacity: 1, duration: 0.08 })
         .add(() => {
              if (destiny.rarity === 'hard') triggerImpactFrame();
              resetRevealScene();
         });
 
-        // 5. 陨石砸入 (The Meteor Slam)
-        // 关键修复：使用 xPercent/yPercent 强制忽略 CSS 中的任何 translate 偏移，确保中心对齐
         mainTl.set(cardRevealOverlay, { opacity: 1, pointerEvents: "auto" }, "+=0.04")
           .add(() => {
               cardRevealOverlay.classList.add('active', 'impacting');
               cardStage.classList.add('materializing');
-              // 强制中心对齐偏移
               gsap.set(cardStage, { xPercent: -50, yPercent: -50 });
+              logTiltDebug('reveal/activated', {}, { force: true });
           })
           .fromTo(cardStage, 
-              { 
-                  y: 1200, 
-                  scale: 0.1, 
-                  rotateX: 70, 
-                  opacity: 0,
-                  filter: "blur(40px)"
-              },
-              { 
-                  y: -80, 
-                  scale: 1.25, 
-                  rotateX: -18, 
-                  opacity: 1,
-                  filter: "blur(0px)",
-                  duration: 0.52, 
-                  ease: "power4.in" 
-              }
+              { y: 1200, scale: 0.1, rotateX: 70, opacity: 0, filter: "blur(40px)" },
+              { y: -80, scale: 1.25, rotateX: -18, opacity: 1, filter: "blur(0px)", duration: 0.52, ease: "power4.in" }
           )
-          // 落地瞬间的物理反弹和余震
           .addLabel("slam-moment")
           .add(() => {
               triggerShake(destiny.rarity === 'hard' ? 'heavy' : 'medium');
@@ -1078,54 +1094,42 @@ async function triggerSummon() {
               clearSummonScene();
           }, "slam-moment")
           .to(cardStage, { 
-              y: 0, 
-              scale: 1, 
-              rotateX: 0, 
-              duration: 0.75, 
-              ease: "elastic.out(1, 0.42)" 
+              y: 0, scale: 1, rotateX: 0, duration: 0.75, ease: "elastic.out(1, 0.42)" 
           }, "slam-moment");
 
-        // 6. 圣光消散与出场
         mainTl.to(whiteFlash, { opacity: 0, duration: 0.9 }, "slam-moment+=0.1")
-          .set(cardStage, { className: "-=materializing +=presented" })
+          .add(() => {
+              cardStage.classList.remove('materializing');
+              cardStage.classList.add('presented');
+              logTiltDebug('reveal/presented', {}, { force: true });
+          })
           .add(() => revealFx.start(destiny.rarity, cardStage.getBoundingClientRect()))
-          .to(cardRevealOverlay, { className: "-=impacting", duration: 0.5 })
-          
-          // --- 核心翻牌动效: Pop & Reveal ---
+          .to({}, {
+              duration: 0.5,
+              onComplete: () => {
+                  cardRevealOverlay.classList.remove('impacting');
+                  logTiltDebug('reveal/impacting-removed', {}, { force: true });
+              }
+          })
           .addLabel("flip-start", "+=0.3")
           .to(theCard, { 
-              onStart: () => theCard.classList.add('flipped'),
-              onComplete: resetCardTilt,
+              onStart: () => {
+                  theCard.classList.add('is-flipped');
+                  logTiltDebug('flip/start', {}, { force: true });
+              },
               z: 130, 
               scale: 1.05, 
               duration: 0.85, 
               ease: "back.out(1.2)" 
           }, "flip-start")
-          // 翻转到一半时触发扫光
-          .to(cardGlare, { 
-              x: "100%", 
-              duration: 1.2, 
-              ease: "power2.inOut" 
-          }, "flip-start+=0.1")
-          // 落地回跳
+          .to(cardGlare, { x: "100%", duration: 1.2, ease: "power2.inOut" }, "flip-start+=0.1")
           .to(theCard, { 
-              z: 0, 
-              scale: 1, 
-              duration: 0.5, 
-              ease: "elastic.out(1, 0.6)" 
+              z: 0, scale: 1, duration: 0.5, ease: "elastic.out(1, 0.6)" 
           }, "-=0.2")
-
-          // --- 按钮稳固显示 ---
           .add(() => retryBtn.classList.add('active'), "+=0.1")
-          .to(retryBtn, { 
-              autoAlpha: 1, 
-              y: 0, 
-              duration: 0.5, 
-              ease: "power2.out" 
-          }, "-=0.2");
+          .to(retryBtn, { autoAlpha: 1, y: 0, duration: 0.5, ease: "power2.out" }, "-=0.2");
 
         await mainTl;
-
     } catch (error) {
         console.error('终极出卡失败:', error);
         revealFx.stop();
@@ -1140,5 +1144,4 @@ async function triggerSummon() {
 
 summonBtn.addEventListener('click', triggerSummon);
 retryBtn.addEventListener('click', triggerSummon);
-
 loadTasks();
