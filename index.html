@@ -39,34 +39,32 @@
     <div id="summon-overlay" data-rarity="normal">
         <div class="summon-backdrop"></div>
         <div class="summon-grid"></div>
-        <div class="summon-column summon-column-left"></div>
-        <div class="summon-column summon-column-right"></div>
-        <div class="summon-shutter summon-shutter-top"></div>
-        <div class="summon-shutter summon-shutter-bottom"></div>
-        <div class="summon-rift-shell" aria-hidden="true">
-            <div class="summon-rift-core"></div>
-            <div class="summon-rift-edge summon-rift-edge-left"></div>
-            <div class="summon-rift-edge summon-rift-edge-right"></div>
-        </div>
-        <div class="summon-card-shell" aria-hidden="true">
-            <div class="card-shell-frame"></div>
-            <div class="card-shell-line"></div>
-            <div class="card-shell-line line-two"></div>
-        </div>
+        <div class="summon-gate-left"></div>
+        <div class="summon-gate-right"></div>
         <canvas id="summon-fx-canvas"></canvas>
         <div id="white-flash"></div>
+        <div class="impact-fx-layer">
+            <div class="impact-halo"></div>
+            <div class="impact-radial-beams"></div>
+        </div>
     </div>
 
     <div id="card-reveal-overlay" data-rarity="normal">
         <div class="reveal-backdrop"></div>
+        <div class="reveal-beams-bg"></div>
         <div class="reveal-horizon"></div>
         <div class="reveal-runway"></div>
         <div class="reveal-rings" aria-hidden="true">
-            <span class="reveal-ring reveal-ring-a"></span>
-            <span class="reveal-ring reveal-ring-b"></span>
-            <span class="reveal-ring reveal-ring-c"></span>
+            <span class="reveal-frame reveal-frame-a"></span>
+            <span class="reveal-frame reveal-frame-b"></span>
+            <span class="reveal-frame reveal-frame-c"></span>
         </div>
         <canvas id="confetti-canvas"></canvas>
+
+        <div id="reveal-title-wrap">
+            <p class="reveal-eyebrow">Heartopia</p>
+            <h2 class="reveal-grand-title">心动小镇</h2>
+        </div>
 
         <div id="card-stage">
             <div id="the-card" class="premium-card">

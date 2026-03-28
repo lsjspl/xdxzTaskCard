@@ -46,9 +46,9 @@ const TIMING = {
     lock: 1600,
     charge: 1900,
     compress: 1050,
-    tear: 260,
-    flash: 180,
-    bridgeLead: 180,
+    tear: 450,
+    flash: 160,
+    bridgeLead: 240,
     revealSettle: 760,
     impactHold: 560,
     flip: 1180,
@@ -133,10 +133,7 @@ function resetCardTilt() {
 
 function clearSummonScene() {
     summonOverlay.classList.remove('active', 'phase-charge', 'phase-compress', 'phase-tear');
-    summonOverlay.style.removeProperty('--rift-open');
-    summonOverlay.style.removeProperty('--rift-glow');
-    summonOverlay.style.removeProperty('--shell-shift');
-    summonOverlay.style.removeProperty('--shell-tilt');
+    summonOverlay.style.removeProperty('--gate-open');
 }
 
 function resetRevealScene() {
@@ -146,6 +143,30 @@ function resetRevealScene() {
     cardStage.classList.remove('materializing', 'presented');
     theCard.classList.remove('flipped');
     resetCardTilt();
+    document.body.classList.remove('screen-shake-heavy');
+}
+
+function triggerShake(intensity = 'medium') {
+    const duration = intensity === 'heavy' ? 500 : intensity === 'light' ? 150 : 300;
+    const cls = intensity === 'light' ? 'screen-shake-light' : 'screen-shake-heavy';
+    document.body.classList.add(cls);
+    setTimeout(() => {
+        document.body.classList.remove(cls);
+    }, duration);
+}
+
+function triggerImpactFrame() {
+    const frame = document.createElement('div');
+    frame.style.cssText = `
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        background: white;
+        mix-blend-mode: difference;
+        pointer-events: none;
+    `;
+    document.body.appendChild(frame);
+    setTimeout(() => frame.remove(), 40);
 }
 
 async function collapseReveal() {
@@ -289,10 +310,7 @@ class SummonFxEngine {
         this.active = false;
         cancelAnimationFrame(this.rafId);
         this.ctx.clearRect(0, 0, this.width, this.height);
-        summonOverlay.style.removeProperty('--rift-open');
-        summonOverlay.style.removeProperty('--rift-glow');
-        summonOverlay.style.removeProperty('--shell-shift');
-        summonOverlay.style.removeProperty('--shell-tilt');
+        summonOverlay.style.removeProperty('--gate-open');
     }
 
     setIntensity(value) {
@@ -310,9 +328,14 @@ class SummonFxEngine {
             this.seedInward(90);
             this.spawnWave(70, 0.2, 2.2);
         } else if (phase === 'tear') {
-            for (let i = 0; i < 180; i += 1) this.spawnBurstStreak();
+            const streakCount = this.palette === RARITY_THEME.hard.fx ? 300 : 180;
+            for (let i = 0; i < streakCount; i += 1) this.spawnBurstStreak();
             this.spawnWave(54, 0.75, 5.2);
             this.spawnWave(84, 0.56, 4.3);
+            if (this.palette === RARITY_THEME.hard.fx) {
+                this.spawnWave(120, 0.8, 8);
+                this.spawnWave(180, 0.4, 12);
+            }
         }
     }
 
@@ -418,32 +441,7 @@ class SummonFxEngine {
         this.ctx.save();
         this.ctx.globalCompositeOperation = 'screen';
 
-        let riftOpen = 0.08;
-        let riftGlow = 0.34;
-        let shellShift = 18;
-        let shellTilt = 0;
-
-        if (this.phase === 'charge') {
-            riftOpen = 0.18 + Math.sin(this.phaseTime * 0.06) * 0.02;
-            riftGlow = 0.76;
-            shellShift = Math.sin(this.phaseTime * 0.14) * 6;
-            shellTilt = `${Math.sin(this.phaseTime * 0.1) * 1.4}deg`;
-        } else if (this.phase === 'compress') {
-            riftOpen = 0.034 + Math.sin(this.phaseTime * 0.4) * 0.006;
-            riftGlow = 1.18;
-            shellShift = Math.sin(this.phaseTime * 0.9) * 10;
-            shellTilt = `${Math.sin(this.phaseTime * 0.75) * 2.6}deg`;
-        } else if (this.phase === 'tear') {
-            riftOpen = 0.88;
-            riftGlow = 1.42;
-            shellShift = -52;
-            shellTilt = '0deg';
-        }
-
-        summonOverlay.style.setProperty('--rift-open', riftOpen.toFixed(3));
-        summonOverlay.style.setProperty('--rift-glow', riftGlow.toFixed(3));
-        summonOverlay.style.setProperty('--shell-shift', `${shellShift.toFixed(1)}px`);
-        summonOverlay.style.setProperty('--shell-tilt', shellTilt);
+        const riftGlow = this.phase === 'charge' ? 0.76 : this.phase === 'compress' ? 1.18 : 1.42;
 
         const centerGlow = this.ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 320);
         centerGlow.addColorStop(0, `rgba(${this.palette[1]},${0.12 + riftGlow * 0.14})`);
@@ -473,7 +471,7 @@ class SummonFxEngine {
             this.ctx.shadowBlur = 18;
             this.ctx.shadowColor = `rgba(${mote.color},${alpha})`;
             this.ctx.beginPath();
-            this.ctx.arc(mote.x, mote.y, mote.size, 0, Math.PI * 2);
+            this.ctx.rect(mote.x - mote.size/2, mote.y - mote.size/2, mote.size, mote.size);
             this.ctx.fill();
         });
 
@@ -545,28 +543,17 @@ class SummonFxEngine {
 
             this.ctx.strokeStyle = `rgba(${wave.color},${wave.alpha})`;
             this.ctx.lineWidth = wave.width;
+            this.ctx.save();
+            this.ctx.translate(centerX, centerY);
+            this.ctx.rotate(Math.PI / 4); // Diamond rotation
             this.ctx.beginPath();
-            this.ctx.ellipse(centerX, centerY, wave.radius, wave.radius * 0.58, 0, 0, Math.PI * 2);
+            const r = wave.radius;
+            this.ctx.rect(-r, -r, r * 2, r * 2);
             this.ctx.stroke();
+            this.ctx.restore();
 
             return wave.alpha > 0.02;
         });
-
-        if (this.phase === 'compress') {
-            this.ctx.strokeStyle = `rgba(${this.palette[2]},0.58)`;
-            this.ctx.lineWidth = 2;
-            this.ctx.beginPath();
-            this.ctx.moveTo(centerX - 30, 0);
-            this.ctx.lineTo(centerX - 30, this.height);
-            this.ctx.moveTo(centerX + 30, 0);
-            this.ctx.lineTo(centerX + 30, this.height);
-            this.ctx.stroke();
-        }
-
-        if (this.phase === 'tear') {
-            this.ctx.fillStyle = `rgba(${this.palette[2]},0.82)`;
-            this.ctx.fillRect(centerX - 3, 0, 6, this.height);
-        }
 
         this.ctx.restore();
         this.rafId = requestAnimationFrame(this.animate);
@@ -681,9 +668,14 @@ class RevealFxEngine {
 
             this.ctx.strokeStyle = `rgba(${ring.color},${ring.alpha})`;
             this.ctx.lineWidth = ring.width;
+            this.ctx.save();
+            this.ctx.translate(this.anchor.x, this.anchor.y);
+            this.ctx.rotate(Math.PI / 4);
             this.ctx.beginPath();
-            this.ctx.ellipse(this.anchor.x, this.anchor.y, ring.radius, ring.radius * 0.74, 0, 0, Math.PI * 2);
+            const r = ring.radius;
+            this.ctx.rect(-r, -r, r * 2, r * 2);
             this.ctx.stroke();
+            this.ctx.restore();
 
             return ring.alpha > 0.02;
         });
@@ -773,10 +765,13 @@ document.addEventListener('pointermove', event => {
     const dx = clamp((event.clientX - centerX) / (rect.width / 2), -1, 1);
     const dy = clamp((event.clientY - centerY) / (rect.height / 2), -1, 1);
 
-    theCard.style.transform = `rotateX(${-dy * 18}deg) rotateY(${dx * 18}deg)`;
-    cardGlare.style.transform = `translate(${dx * 22}px, ${dy * 22}px) rotate(${dx * 6}deg)`;
+    theCard.style.transition = 'transform 0.1s ease-out, filter 0.18s ease-out';
+    theCard.style.transform = `rotateX(${-dy * 20}deg) rotateY(${dx * 20}deg)`;
+    cardGlare.style.transform = `translate(${dx * 25}px, ${dy * 25}px) rotate(${dx * 8}deg)`;
 });
 
+document.addEventListener('pointerup', resetCardTilt);
+document.addEventListener('pointercancel', resetCardTilt);
 cardRevealOverlay.addEventListener('pointerleave', resetCardTilt);
 window.addEventListener('blur', resetCardTilt);
 window.addEventListener('keydown', event => {
@@ -816,17 +811,28 @@ async function triggerSummon() {
         summonOverlay.classList.add('phase-compress');
         summonFx.setPhase('compress');
         summonFx.setIntensity(2.2);
+        triggerShake('light');
 
         await sleep(TIMING.compress);
 
         summonOverlay.classList.add('phase-tear');
         summonFx.setPhase('tear');
-        summonFx.setIntensity(3.2);
+        summonFx.setIntensity(destiny.rarity === 'hard' ? 5.0 : 3.2);
+
+        triggerShake(destiny.rarity === 'hard' ? 'heavy' : 'medium');
+        if (destiny.rarity === 'hard') {
+            triggerImpactFrame();
+            setTimeout(triggerImpactFrame, 80);
+        }
 
         await sleep(TIMING.tear);
 
         whiteFlash.style.transition = 'none';
         whiteFlash.style.opacity = '1';
+
+        if (destiny.rarity === 'hard') {
+            triggerImpactFrame();
+        }
 
         resetRevealScene();
 
