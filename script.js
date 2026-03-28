@@ -163,7 +163,7 @@ function resetCardTilt() {
 }
 
 function canTiltCard() {
-    return cardRevealOverlay.classList.contains('active') && cardStage.classList.contains('presented');
+    return cardRevealOverlay.classList.contains('active');
 }
 
 function updateCardTilt(clientX, clientY) {
@@ -178,17 +178,17 @@ function updateCardTilt(clientX, clientY) {
     const foil = document.getElementById('card-holographic-foil');
     const charPop = document.getElementById('card-char-pop');
 
-    theCard.style.transition = 'transform 0.1s ease-out, filter 0.18s ease-out';
-    theCard.style.transform = `rotateX(${-dy * 14}deg) rotateY(${dx * 14}deg)`;
-    cardBgImage.style.transform = `translate3d(${-dx * 18}px, ${-dy * 12}px, 0) scale(1.12)`;
-    cardGlare.style.transform = `translate(${dx * 20}px, ${dy * 20}px) rotate(${dx * 5}deg)`;
+    theCard.style.transition = 'transform 0.08s ease-out, filter 0.18s ease-out';
+    theCard.style.transform = `perspective(1400px) rotateX(${-dy * 18}deg) rotateY(${dx * 18}deg) translateZ(18px) scale(1.02)`;
+    cardBgImage.style.transform = `translate3d(${-dx * 26}px, ${-dy * 18}px, 0) scale(1.18)`;
+    cardGlare.style.transform = `translate(${dx * 30}px, ${dy * 26}px) rotate(${dx * 8}deg)`;
 
     if (foil) {
         foil.style.backgroundPosition = `${50 + dx * 20}% ${50 + dy * 20}%`;
     }
 
     if (charPop) {
-        charPop.style.transform = `translateX(calc(-50% + ${dx * 30}px)) translateY(${8 + dy * 14}px) translateZ(96px) rotateX(${-dy * 6}deg) rotateY(${dx * 8}deg) rotateZ(${dx * 4}deg) scale(${1.03 + Math.abs(dx) * 0.03})`;
+        charPop.style.transform = `translateX(calc(-50% + ${dx * 40}px)) translateY(${8 + dy * 18}px) translateZ(118px) rotateX(${-dy * 8}deg) rotateY(${dx * 11}deg) rotateZ(${dx * 5}deg) scale(${1.05 + Math.abs(dx) * 0.05})`;
     }
 }
 
@@ -841,8 +841,20 @@ const revealFx = new RevealFxEngine(confettiCanvas);
 
 mainBg.draw();
 
+cardRevealOverlay.addEventListener('mousemove', event => {
+    if (!canTiltCard()) return;
+    updateCardTilt(event.clientX, event.clientY);
+});
+
+cardRevealOverlay.addEventListener('mousedown', event => {
+    if (!canTiltCard()) return;
+    updateCardTilt(event.clientX, event.clientY);
+});
+
 document.addEventListener('pointermove', event => {
-    if (!cardRevealOverlay.classList.contains('active') || !cardStage.classList.contains('presented')) return;
+    if (!canTiltCard() || event.pointerType === 'touch') return;
+    updateCardTilt(event.clientX, event.clientY);
+    return;
 
     const rect = cardStage.getBoundingClientRect();
     const centerX = rect.left + rect.width / 2;
@@ -879,6 +891,7 @@ cardRevealOverlay.addEventListener('pointerleave', event => {
         resetCardTilt();
     }
 });
+cardRevealOverlay.addEventListener('mouseleave', resetCardTilt);
 cardRevealOverlay.addEventListener('pointerdown', event => {
     if (!canTiltCard()) return;
 
