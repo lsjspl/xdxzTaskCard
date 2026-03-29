@@ -539,29 +539,85 @@ body {
   filter: blur(0.4px);
 }
 
+.summon-rift {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: var(--rift-width, 0px);
+  height: 100vh;
+  background: #ffffff;
+  box-shadow: 
+    0 0 30px 10px rgba(255, 255, 255, 0.9),
+    0 0 80px 40px rgba(var(--accent-main), 0.8),
+    0 0 120px 60px rgba(var(--accent-main), 0.5);
+  z-index: 9;
+  opacity: 0;
+  transition: width 0.1s, opacity 0.3s;
+  pointer-events: none;
+}
+
 .summon-gate-left,
 .summon-gate-right {
   position: absolute;
   top: 0;
-  width: 50.1%;
+  width: 50.5%;
   height: 100%;
   z-index: 10;
   background:
-    linear-gradient(to right, #fffcf0 0%, #f7e7c0 85%, rgba(var(--accent-main), 0.3) 100%);
-  border-right: 4px solid rgba(var(--accent-main), 0.8);
-  box-shadow: 10px 0 40px rgba(0, 0, 0, 0.2);
-  overflow: hidden;
+    linear-gradient(to right, rgba(255, 253, 248, 0.96) 0%, rgba(247, 231, 192, 0.98) 85%, rgba(var(--accent-main), 0.3) 100%),
+    radial-gradient(circle at 10px 10px, rgba(255, 194, 46, 0.08) 2px, transparent 2px) 0 0 / 20px 20px;
+  box-shadow: 
+    inset 0 0 60px rgba(255, 194, 46, 0.15),
+    10px 0 40px rgba(0,0,0,0.15);
+  overflow: visible;
+}
+
+.summon-gate-left::before,
+.summon-gate-right::before {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 50px;
+  height: 140px;
+  background: linear-gradient(90deg, #ffb300 0%, #ffe680 100%);
+  border-radius: 140px 0 0 140px;
+  box-shadow: 
+    0 0 40px rgba(255, 194, 46, 0.6),
+    inset 4px 0 10px rgba(255, 255, 255, 0.5);
+  z-index: 12;
 }
 
 .summon-gate-left::after,
 .summon-gate-right::after {
   content: "";
   position: absolute;
-  inset: -8% -36%;
+  right: 0;
+  top: 0;
+  width: 8px;
+  height: 100%;
+  background: linear-gradient(180deg, transparent 0%, #ffd54f 20%, #ffffff 50%, #ffd54f 80%, transparent 100%);
+  z-index: 11;
+  box-shadow: 0 0 30px rgba(255, 194, 46, 0.8);
+  transition: box-shadow 0.2s, background 0.2s;
+}
+
+.gate-deco {
+  position: absolute;
+  inset: 4% 12% 4% 6%;
+  border: 2px solid rgba(255, 194, 46, 0.4);
+  border-radius: 24px;
   pointer-events: none;
-  background: linear-gradient(115deg, transparent 28%, rgba(255, 255, 255, 0.52) 50%, transparent 72%);
-  transform: translateX(-90%);
-  opacity: 0;
+}
+
+.gate-deco::before {
+  content: "";
+  position: absolute;
+  inset: 12px;
+  border: 2px dashed rgba(255, 194, 46, 0.3);
+  border-radius: 14px;
 }
 
 .summon-gate-left {
@@ -577,25 +633,41 @@ body {
 #summon-overlay.phase-charge {
   --gate-open: 49vw;
 }
+#summon-overlay.phase-charge .summon-rift {
+  opacity: 1;
+  --rift-width: 6px;
+}
 
 #summon-overlay.phase-compress {
   --gate-open: 51vw;
 }
+#summon-overlay.phase-compress .summon-rift {
+  opacity: 1;
+  --rift-width: 20px;
+  box-shadow: 
+    0 0 60px 20px rgba(255, 255, 255, 1),
+    0 0 140px 60px rgba(var(--accent-main), 1),
+    0 0 240px 100px rgba(var(--accent-main), 0.8);
+}
 
 #summon-overlay.phase-compress .summon-gate-left,
 #summon-overlay.phase-compress .summon-gate-right {
-  border-color: rgba(var(--accent-main), 1);
-  box-shadow: 0 0 50px rgba(var(--accent-main), 0.6);
+  box-shadow: 0 0 80px rgba(var(--accent-main), 0.8);
 }
 
 #summon-overlay.phase-compress .summon-gate-left::after,
 #summon-overlay.phase-compress .summon-gate-right::after {
-  opacity: 1;
-  animation: summon-gate-scan 1.05s ease-out infinite;
+  box-shadow: 0 0 50px 10px rgba(255, 255, 255, 0.8);
+  background: #ffffff;
 }
 
 #summon-overlay.phase-tear {
   --gate-open: -40vw;
+}
+#summon-overlay.phase-tear .summon-rift {
+  opacity: 1;
+  --rift-width: 150vw;
+  transition: width 0.38s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 #summon-overlay.phase-tear .summon-gate-left,

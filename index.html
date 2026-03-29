@@ -3,6 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
+    <link rel="icon" href="favicon.ico">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>心动小镇任务抽卡</title>
     <meta name="description" content="心动小镇官方风格任务抽卡系统">
@@ -47,8 +48,14 @@
     <div id="summon-overlay" data-rarity="normal">
         <div class="summon-backdrop"></div>
         <div class="summon-grid"></div>
-        <div class="summon-gate-left"></div>
-        <div class="summon-gate-right"></div>
+        <div class="summon-rift"></div>
+
+        <div class="summon-gate-left">
+            <div class="gate-deco"></div>
+        </div>
+        <div class="summon-gate-right">
+            <div class="gate-deco"></div>
+        </div>
         <canvas id="summon-fx-canvas"></canvas>
         <div id="white-flash"></div>
         <div class="impact-fx-layer">
@@ -81,7 +88,7 @@
                     <div class="card-face face-front">
                         <div class="card-art-stage">
                             <div id="card-bg-image" class="card-bg-image"></div>
-                            
+
                             <!-- Characters that pop out of the art frame -->
                             <div id="card-char-pop" class="card-char-pop"></div>
                         </div>
