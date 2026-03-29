@@ -169,7 +169,12 @@ async function loadTasks() {
             else if (lower.startsWith('## normal')) currentCategory = 'normal';
             else if (lower.startsWith('## hard')) currentCategory = 'hard';
             else if (trimmed.startsWith('- ') && currentCategory) {
-                parsed[currentCategory].push(trimmed.slice(2).trim());
+                const parts = trimmed.slice(2).split('|').map(s => s.trim());
+                parsed[currentCategory].push({
+                    text: parts[0],
+                    bg: parts[1] || '',
+                    char: parts[2] || ''
+                });
             }
         });
 
@@ -187,7 +192,7 @@ function drawDestiny() {
 
     return {
         rarity,
-        task: pool.length ? randomChoice(pool) : theme.fallbackTask,
+        task: pool.length ? randomChoice(pool) : { text: theme.fallbackTask, bg: '', char: '' },
         bg: theme.bg
     };
 }
@@ -209,13 +214,16 @@ function applyDestinySkin(destiny) {
     theCard.classList.add(`theme-${destiny.rarity}`);
 
     rarityText.textContent = theme.label;
-    taskDesc.textContent = destiny.task;
+    taskDesc.textContent = destiny.task.text;
     starsRow.textContent = theme.stars;
-    cardBgImage.style.backgroundImage = `url("${destiny.bg}")`;
+    
+    const bgUrl = destiny.task.bg || theme.bg;
+    cardBgImage.style.backgroundImage = `url("${bgUrl}")`;
     cardBgImage.style.backgroundColor = 'rgba(255, 248, 238, 0.92)';
 
     if (charPop) {
-        charPop.style.backgroundImage = `url('${theme.char}')`;
+        const charUrl = destiny.task.char || theme.char;
+        charPop.style.backgroundImage = `url('${charUrl}')`;
         charPop.style.opacity = '1';
     }
 
@@ -468,21 +476,66 @@ function updateCardTilt(clientX, clientY) {
     });
 }
 
+function canTiltHome() {
+    return !cardRevealOverlay.classList.contains('active') && !summonOverlay.classList.contains('active');
+}
+
+function updateHomeTilt(clientX, clientY) {
+    const halfWidth = window.innerWidth / 2;
+    const halfHeight = window.innerHeight / 2;
+    const dx = clamp((clientX - halfWidth) / halfWidth, -1, 1);
+    const dy = clamp((clientY - halfHeight) / halfHeight, -1, 1);
+    applyHomeTilt(dx, dy);
+}
+
+function applyHomeTilt(dx, dy) {
+    const homeChar = document.getElementById('home-hero-char');
+    const homeBg = document.getElementById('home-hero-bg');
+    if (!homeChar || !homeBg) return;
+
+    gsap.to(homeChar, {
+        xPercent: -50,
+        x: dx * 30,
+        y: dy * 15,
+        rotationY: dx * 5,
+        rotationX: -dy * 2,
+        duration: 0.8,
+        ease: "power2.out",
+        overwrite: "auto"
+    });
+
+    gsap.to(homeBg, {
+        x: dx * -20,
+        y: dy * -10,
+        rotationY: dx * -2,
+        rotationX: dy * 1,
+        duration: 1.2,
+        ease: "power2.out",
+        overwrite: "auto"
+    });
+}
+
 function queueCardTiltUpdate(clientX, clientY) {
     pendingTiltPoint = { clientX, clientY };
     if (tiltRafId) return;
 
     tiltRafId = requestAnimationFrame(() => {
         tiltRafId = 0;
-        if (!pendingTiltPoint || !canTiltCard()) return;
+        if (!pendingTiltPoint) return;
         const { clientX: x, clientY: y } = pendingTiltPoint;
         pendingTiltPoint = null;
-        updateCardTilt(x, y);
+        
+        if (canTiltCard()) {
+            updateCardTilt(x, y);
+        } else if (canTiltHome() && !isSummoning) {
+            updateHomeTilt(x, y);
+        }
     });
 }
 
 function handleGyroOrientation(event) {
-    if (!gyroTiltEnabled || activeTiltPointerId !== null || !canTiltCard()) return;
+    if (!gyroTiltEnabled || activeTiltPointerId !== null) return;
+    if (!canTiltCard() && (!canTiltHome() || isSummoning)) return;
     if (!Number.isFinite(event.beta) || !Number.isFinite(event.gamma)) return;
 
     const angle = getOrientationAngle();
@@ -521,11 +574,15 @@ function handleGyroOrientation(event) {
     if (Math.abs(gyroFiltered.dx) < 0.02) gyroFiltered.dx = 0;
     if (Math.abs(gyroFiltered.dy) < 0.02) gyroFiltered.dy = 0;
 
-    applyCardTilt(gyroFiltered.dx, gyroFiltered.dy, 'gyro', {
-        beta: roundTiltDebugValue(beta),
-        gamma: roundTiltDebugValue(gamma),
-        angle
-    });
+    if (canTiltCard()) {
+        applyCardTilt(gyroFiltered.dx, gyroFiltered.dy, 'gyro', {
+            beta: roundTiltDebugValue(beta),
+            gamma: roundTiltDebugValue(gamma),
+            angle
+        });
+    } else {
+        applyHomeTilt(gyroFiltered.dx, gyroFiltered.dy);
+    }
 }
 
 function startGyroTiltListener() {
@@ -1229,7 +1286,7 @@ mainBg.draw();
 
 // Unified Pointer Events for Touch, Pen, and Mouse hover/drag
 window.addEventListener('pointerdown', event => {
-    if (!canTiltCard()) return;
+    if (!canTiltCard() && !canTiltHome()) return;
 
     const isMouse = event.pointerType === 'mouse';
     activeTiltPointerId = isMouse ? null : event.pointerId;
@@ -1245,7 +1302,7 @@ window.addEventListener('pointerdown', event => {
 });
 
 window.addEventListener('pointermove', event => {
-    if (!canTiltCard()) return;
+    if (!canTiltCard() && !canTiltHome()) return;
 
     const isMouse = event.pointerType === 'mouse';
     const isActivePointer = activeTiltPointerId === event.pointerId;
@@ -1254,18 +1311,11 @@ window.addEventListener('pointermove', event => {
     // Prevent scrolling on mobile during interaction
     if (event.pointerType === 'touch') {
         const target = event.target;
-        // Only prevent default if interacting with the card area to preserve UI scrolling if any
-        if (cardRevealOverlay.contains(target)) {
+        if (cardRevealOverlay.contains(target) || (canTiltHome() && target.closest('#home-hero-stage'))) {
             event.preventDefault();
         }
     }
 
-    logTiltDebug('pointermove', {
-        pointerId: event.pointerId,
-        pointerType: event.pointerType,
-        clientX: roundTiltDebugValue(event.clientX),
-        clientY: roundTiltDebugValue(event.clientY)
-    });
     queueCardTiltUpdate(event.clientX, event.clientY);
 }, { passive: false });
 
