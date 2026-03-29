@@ -83,11 +83,23 @@ const randomChoice = items => items[Math.floor(Math.random() * items.length)];
 const randomRange = (min, max) => Math.random() * (max - min) + min;
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const lerp = (start, end, amount) => start + (end - start) * amount;
+
+function shouldUseLiteFx() {
+    if (typeof window === 'undefined') return false;
+    const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const lowMemoryDevice = typeof navigator !== 'undefined' && Number.isFinite(navigator.deviceMemory) && navigator.deviceMemory <= 4;
+    const lowCpuDevice = typeof navigator !== 'undefined' && Number.isFinite(navigator.hardwareConcurrency) && navigator.hardwareConcurrency <= 4;
+    return Boolean(prefersReducedMotion || lowMemoryDevice || lowCpuDevice);
+}
+
 let lastTiltDebugAt = 0;
+let pendingTiltPoint = null;
+let tiltRafId = 0;
+let tiltBoundsCache = null;
+let tiltBoundsCacheAt = 0;
 
 if (typeof window !== 'undefined' && typeof window.__CARD_TILT_DEBUG__ === 'undefined') {
-    window.__CARD_TILT_DEBUG__ = true;
-    console.info('[card-tilt] debug logging enabled. Set window.__CARD_TILT_DEBUG__ = false to silence logs.');
+    window.__CARD_TILT_DEBUG__ = false;
 }
 
 function isTiltDebugEnabled() {
@@ -218,6 +230,11 @@ function resetCardTilt() {
     const charPop = document.getElementById('card-char-pop');
 
     resetGyroBaseline();
+    pendingTiltPoint = null;
+    if (tiltRafId) {
+        cancelAnimationFrame(tiltRafId);
+        tiltRafId = 0;
+    }
     logTiltDebug('reset/request', { activeTiltPointerId }, { force: true });
 
     gsap.to(theCard, {
@@ -289,6 +306,11 @@ function resetCardTilt() {
     requestAnimationFrame(() => {
         logTiltDebug('reset/applied', {}, { force: true });
     });
+}
+
+function clearTiltBoundsCache() {
+    tiltBoundsCache = null;
+    tiltBoundsCacheAt = 0;
 }
 
 function canTiltCard() {
@@ -407,17 +429,24 @@ function applyCardTilt(dx, dy, source = 'pointer', payload = {}) {
 }
 
 function getCardTiltBounds() {
+    const now = performance.now();
+    if (tiltBoundsCache && now - tiltBoundsCacheAt < 80) {
+        return tiltBoundsCache;
+    }
+
     const rect = cardStage.getBoundingClientRect();
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
 
-    return {
+    tiltBoundsCache = {
         rect,
         centerX,
         centerY,
         halfWidth: Math.max(rect.width * 0.72, 180),
         halfHeight: Math.max(rect.height * 0.72, 240)
     };
+    tiltBoundsCacheAt = now;
+    return tiltBoundsCache;
 }
 
 function updateCardTilt(clientX, clientY) {
@@ -436,6 +465,19 @@ function updateCardTilt(clientX, clientY) {
         centerY: roundTiltDebugValue(centerY),
         halfWidth: roundTiltDebugValue(halfWidth),
         halfHeight: roundTiltDebugValue(halfHeight)
+    });
+}
+
+function queueCardTiltUpdate(clientX, clientY) {
+    pendingTiltPoint = { clientX, clientY };
+    if (tiltRafId) return;
+
+    tiltRafId = requestAnimationFrame(() => {
+        tiltRafId = 0;
+        if (!pendingTiltPoint || !canTiltCard()) return;
+        const { clientX: x, clientY: y } = pendingTiltPoint;
+        pendingTiltPoint = null;
+        updateCardTilt(x, y);
     });
 }
 
@@ -531,8 +573,10 @@ async function ensureGyroTiltAccess() {
 }
 
 function clearSummonScene() {
-    summonOverlay.classList.remove('active', 'phase-charge', 'phase-compress', 'phase-tear');
+    summonOverlay.classList.remove('active', 'phase-charge', 'phase-compress', 'phase-tear', 'phase-bridge');
     summonOverlay.style.removeProperty('--gate-open');
+    summonOverlay.style.removeProperty('--bridge-x');
+    summonOverlay.style.removeProperty('--bridge-y');
 }
 
 function resetRevealScene() {
@@ -606,6 +650,8 @@ class BackgroundEngine {
         setCanvasSize(this.canvas, this.ctx);
         this.width = window.innerWidth;
         this.height = window.innerHeight;
+        this.isMobileViewport = this.width <= 768;
+        this.fxVisibilityBoost = this.isMobileViewport ? 1.28 : 1;
     }
 
     seed() {
@@ -678,6 +724,7 @@ class SummonFxEngine {
         this.inward = [];
         this.burst = [];
         this.waves = [];
+        this.bridgeTarget = null;
         this.rafId = 0;
         this.resize();
         window.addEventListener('resize', () => this.resize());
@@ -687,6 +734,9 @@ class SummonFxEngine {
         setCanvasSize(this.canvas, this.ctx);
         this.width = window.innerWidth;
         this.height = window.innerHeight;
+        this.isMobileViewport = this.width <= 768;
+        this.liteFx = shouldUseLiteFx();
+        this.fxVisibilityBoost = this.isMobileViewport ? 1.28 : 1;
     }
 
     start(rarity) {
@@ -700,6 +750,7 @@ class SummonFxEngine {
         this.inward = [];
         this.burst = [];
         this.waves = [];
+        this.bridgeTarget = null;
         this.animate();
     }
 
@@ -719,12 +770,14 @@ class SummonFxEngine {
         this.phase = phase;
         this.phaseTime = 0;
         if (phase === 'charge') {
-            this.seedInward(40);
+            this.seedInward(this.liteFx ? 28 : 40);
         } else if (phase === 'compress') {
-            this.seedInward(90);
+            this.seedInward(this.liteFx ? 64 : 90);
             this.spawnWave(70, 0.2, 2.2);
         } else if (phase === 'tear') {
-            const streakCount = this.palette === RARITY_THEME.hard.fx ? 300 : 180;
+            const streakCount = this.palette === RARITY_THEME.hard.fx
+                ? (this.liteFx ? 180 : 300)
+                : (this.liteFx ? 120 : 180);
             for (let i = 0; i < streakCount; i += 1) this.spawnBurstStreak();
             this.spawnWave(54, 0.75, 5.2);
             this.spawnWave(84, 0.56, 4.3);
@@ -732,13 +785,24 @@ class SummonFxEngine {
                 this.spawnWave(120, 0.8, 8);
                 this.spawnWave(180, 0.4, 12);
             }
+        } else if (phase === 'bridge') {
+            this.spawnWave(72, 0.52, 4.4);
         }
+    }
+
+    setBridgeTarget(x, y) {
+        if (!Number.isFinite(x) || !Number.isFinite(y)) {
+            this.bridgeTarget = null;
+            return;
+        }
+        this.bridgeTarget = { x, y };
     }
 
     seedAmbient() {
         const centerX = this.width / 2;
         const centerY = this.height / 2;
-        this.ambient = Array.from({ length: 96 }, () => {
+        const ambientCount = this.liteFx ? 58 : 96;
+        this.ambient = Array.from({ length: ambientCount }, () => {
             const angle = Math.random() * Math.PI * 2;
             const radius = randomRange(80, Math.min(this.width, this.height) * 0.42);
             return {
@@ -835,14 +899,36 @@ class SummonFxEngine {
 
         const riftGlow = this.phase === 'charge' ? 0.76 : this.phase === 'compress' ? 1.18 : 1.42;
 
-        const centerGlow = this.ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 320);
-        centerGlow.addColorStop(0, `rgba(${this.palette[1]},${0.12 + riftGlow * 0.14})`);
-        centerGlow.addColorStop(0.3, `rgba(${this.palette[0]},${0.1 + riftGlow * 0.12})`);
+        const centerGlowRadius = this.isMobileViewport ? 360 : 320;
+        const boostedCoreAlpha = (0.12 + riftGlow * 0.14) * this.fxVisibilityBoost;
+        const boostedMidAlpha = (0.1 + riftGlow * 0.12) * this.fxVisibilityBoost;
+        const centerGlow = this.ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, centerGlowRadius);
+        centerGlow.addColorStop(0, `rgba(${this.palette[1]},${Math.min(boostedCoreAlpha, 0.9)})`);
+        centerGlow.addColorStop(0.3, `rgba(${this.palette[0]},${Math.min(boostedMidAlpha, 0.78)})`);
         centerGlow.addColorStop(1, 'rgba(255,255,255,0)');
         this.ctx.fillStyle = centerGlow;
         this.ctx.beginPath();
-        this.ctx.arc(centerX, centerY, 320, 0, Math.PI * 2);
+        this.ctx.arc(centerX, centerY, centerGlowRadius, 0, Math.PI * 2);
         this.ctx.fill();
+
+        if (this.phase === 'charge' || this.phase === 'compress' || this.phase === 'tear') {
+            const phaseEnergy = this.phase === 'charge' ? 0.45 : this.phase === 'compress' ? 0.72 : 0.96;
+            for (let i = 0; i < 3; i += 1) {
+                const ringRadius = 86 + i * 34 + Math.sin(this.phaseTime * 0.04 + i) * 8;
+                const alpha = (0.08 + phaseEnergy * 0.16) * (1 - i * 0.18) * this.fxVisibilityBoost;
+                this.ctx.save();
+                this.ctx.translate(centerX, centerY);
+                this.ctx.rotate(this.phaseTime * (0.01 + i * 0.004) * (i % 2 === 0 ? 1 : -1));
+                this.ctx.strokeStyle = `rgba(${this.palette[i % this.palette.length]},${Math.min(alpha, 0.92)})`;
+                this.ctx.lineWidth = (1.4 + i * 0.8) * (this.isMobileViewport ? 1.2 : 1);
+                this.ctx.shadowBlur = (20 + i * 8) * (this.isMobileViewport ? 1.25 : 1);
+                this.ctx.shadowColor = `rgba(${this.palette[i % this.palette.length]},${Math.min(alpha, 0.92)})`;
+                this.ctx.beginPath();
+                this.ctx.ellipse(0, 0, ringRadius, ringRadius * 0.58, 0, 0, Math.PI * 2);
+                this.ctx.stroke();
+                this.ctx.restore();
+            }
+        }
 
         this.ambient.forEach(mote => {
             if (this.phase === 'lock') {
@@ -866,11 +952,14 @@ class SummonFxEngine {
         });
 
         if ((this.phase === 'charge' || this.phase === 'compress') && this.phaseTime % (this.phase === 'compress' ? 1 : 2) === 0) {
-            const count = this.phase === 'compress' ? 7 : 4;
+            const count = this.phase === 'compress'
+                ? (this.liteFx ? 4 : 7)
+                : (this.liteFx ? 2 : 4);
             for (let i = 0; i < count; i += 1) this.spawnInwardShard();
         }
         if (this.phase === 'tear' && this.phaseTime < 20) {
-            for (let i = 0; i < 18; i += 1) this.spawnBurstStreak();
+            const burstCount = this.liteFx ? 10 : 18;
+            for (let i = 0; i < burstCount; i += 1) this.spawnBurstStreak();
         }
 
         this.inward = this.inward.filter(shard => {
@@ -936,6 +1025,25 @@ class SummonFxEngine {
             this.ctx.restore();
             return wave.alpha > 0.02;
         });
+
+        if (this.bridgeTarget && (this.phase === 'tear' || this.phase === 'bridge')) {
+            const beamAlpha = this.phase === 'bridge' ? 0.4 : 0.26;
+            const bridgeStroke = this.ctx.createLinearGradient(centerX, centerY, this.bridgeTarget.x, this.bridgeTarget.y);
+            bridgeStroke.addColorStop(0, `rgba(${this.palette[1]},${beamAlpha})`);
+            bridgeStroke.addColorStop(0.6, `rgba(${this.palette[0]},${beamAlpha * 0.72})`);
+            bridgeStroke.addColorStop(1, `rgba(${this.palette[2]},0)`);
+            this.ctx.strokeStyle = bridgeStroke;
+            this.ctx.lineWidth = this.phase === 'bridge' ? 7.5 : 4.2;
+            this.ctx.lineCap = 'round';
+            this.ctx.shadowBlur = this.phase === 'bridge' ? 30 : 20;
+            this.ctx.shadowColor = `rgba(${this.palette[1]},${beamAlpha})`;
+            this.ctx.beginPath();
+            this.ctx.moveTo(centerX, centerY);
+            const controlX = lerp(centerX, this.bridgeTarget.x, 0.45);
+            const controlY = Math.min(centerY, this.bridgeTarget.y) - (this.phase === 'bridge' ? 86 : 52);
+            this.ctx.quadraticCurveTo(controlX, controlY, this.bridgeTarget.x, this.bridgeTarget.y);
+            this.ctx.stroke();
+        }
         this.ctx.restore();
         this.rafId = requestAnimationFrame(this.animate);
     };
@@ -1118,33 +1226,29 @@ mainBg.draw();
 
 // --- Enhanced Event Listeners for 3D Parallax ---
 
-// Use window listeners to keep tracking even if the pointer leaves the overlay
-window.addEventListener('mousemove', event => {
-    if (!canTiltCard()) return;
-    logTiltDebug('mousemove', {
-        clientX: roundTiltDebugValue(event.clientX),
-        clientY: roundTiltDebugValue(event.clientY)
-    });
-    updateCardTilt(event.clientX, event.clientY);
-});
-
-// Unified Pointer Events for Touch and Mouse Drag
+// Unified Pointer Events for Touch, Pen, and Mouse hover/drag
 window.addEventListener('pointerdown', event => {
     if (!canTiltCard()) return;
 
-    activeTiltPointerId = event.pointerId;
+    const isMouse = event.pointerType === 'mouse';
+    activeTiltPointerId = isMouse ? null : event.pointerId;
     resetGyroBaseline();
     logTiltDebug('pointerdown', {
         pointerId: event.pointerId,
         pointerType: event.pointerType,
+        trackAsActive: !isMouse,
         clientX: roundTiltDebugValue(event.clientX),
         clientY: roundTiltDebugValue(event.clientY)
     }, { force: true });
-    updateCardTilt(event.clientX, event.clientY);
+    queueCardTiltUpdate(event.clientX, event.clientY);
 });
 
 window.addEventListener('pointermove', event => {
-    if (activeTiltPointerId !== event.pointerId || !canTiltCard()) return;
+    if (!canTiltCard()) return;
+
+    const isMouse = event.pointerType === 'mouse';
+    const isActivePointer = activeTiltPointerId === event.pointerId;
+    if (!isMouse && !isActivePointer) return;
 
     // Prevent scrolling on mobile during interaction
     if (event.pointerType === 'touch') {
@@ -1161,7 +1265,7 @@ window.addEventListener('pointermove', event => {
         clientX: roundTiltDebugValue(event.clientX),
         clientY: roundTiltDebugValue(event.clientY)
     });
-    updateCardTilt(event.clientX, event.clientY);
+    queueCardTiltUpdate(event.clientX, event.clientY);
 }, { passive: false });
 
 const endPointerInteraction = (event) => {
@@ -1179,6 +1283,8 @@ const endPointerInteraction = (event) => {
 window.addEventListener('pointerup', endPointerInteraction);
 window.addEventListener('pointercancel', endPointerInteraction);
 window.addEventListener('orientationchange', resetGyroBaseline);
+window.addEventListener('resize', clearTiltBoundsCache);
+window.addEventListener('scroll', clearTiltBoundsCache, { passive: true });
 
 // Reset tilt when mouse leaves the viewport entirely
 document.addEventListener('mouseleave', resetCardTilt);
@@ -1197,6 +1303,8 @@ async function triggerSummon() {
         const destiny = drawDestiny();
         const fxRarity = getFxRarity();
         const retrying = cardRevealOverlay.classList.contains('active');
+        const bridgeTargetX = window.innerWidth / 2;
+        const bridgeTargetY = window.innerHeight * 0.46;
         applyDestinySkin(destiny);
         if (retrying) await collapseReveal();
 
@@ -1209,8 +1317,11 @@ async function triggerSummon() {
             onStart: () => {
                 clearSummonScene();
                 summonOverlay.classList.add('active');
+                summonOverlay.style.setProperty('--bridge-x', `${bridgeTargetX}px`);
+                summonOverlay.style.setProperty('--bridge-y', `${bridgeTargetY}px`);
                 whiteFlash.style.opacity = '0';
                 summonFx.start(fxRarity);
+                summonFx.setBridgeTarget(bridgeTargetX, bridgeTargetY);
                 // Force reset with standard GSAP properties
                 gsap.set(theCard, { rotationX: 0, rotationY: 0, rotationZ: 0, z: 0, scale: 1 });
                 gsap.set(cardInnerWrap, { rotationY: 0 });
@@ -1240,6 +1351,10 @@ async function triggerSummon() {
                 setTimeout(triggerImpactFrame, 80);
             }
         }).to(summonOverlay, { "--gate-open": "-30vw", duration: 0.38, ease: "expo.in" })
+            .add(() => {
+                summonOverlay.classList.add('phase-bridge');
+                summonFx.setPhase('bridge');
+            }, "-=0.08")
             .to(whiteFlash, { opacity: 1, duration: 0.08 })
             .add(() => {
                 if (fxRarity === 'hard') triggerImpactFrame();
