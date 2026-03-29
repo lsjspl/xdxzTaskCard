@@ -923,6 +923,7 @@ class SummonFxEngine {
                 this.ctx.lineWidth = (1.4 + i * 0.8) * (this.isMobileViewport ? 1.2 : 1);
                 this.ctx.shadowBlur = (20 + i * 8) * (this.isMobileViewport ? 1.25 : 1);
                 this.ctx.shadowColor = `rgba(${this.palette[i % this.palette.length]},${Math.min(alpha, 0.92)})`;
+
                 this.ctx.beginPath();
                 this.ctx.ellipse(0, 0, ringRadius, ringRadius * 0.58, 0, 0, Math.PI * 2);
                 this.ctx.stroke();
