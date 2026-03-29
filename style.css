@@ -473,6 +473,9 @@ body.fx-mobile #main-bg-canvas {
 #summon-overlay {
   --rift-open: 0.08;
   --rift-glow: 0.34;
+  --rift-bloom-alpha: 0;
+  --rift-bloom-scale: 0.72;
+  --rift-fan-alpha: 0;
   --bridge-alpha: 0;
   --bridge-x: 50vw;
   --bridge-y: 46vh;
@@ -602,24 +605,55 @@ body.fx-mobile #main-bg-canvas {
   transform: translateX(-50%);
   width: var(--rift-width, 0px);
   height: 100vh;
+  overflow: visible;
   background: linear-gradient(90deg, 
     transparent 0%, 
-    rgba(var(--accent-main), 0.2) 10%,
-    rgba(var(--accent-main), 0.95) 30%, 
+    rgba(var(--accent-main), 0.08) 12%,
+    rgba(var(--accent-main), 0.42) 28%, 
     #ffffff 50%, 
-    rgba(var(--accent-main), 0.95) 70%, 
-    rgba(var(--accent-main), 0.2) 90%,
+    rgba(var(--accent-main), 0.42) 72%, 
+    rgba(var(--accent-main), 0.08) 88%,
     transparent 100%
   );
   box-shadow: 
-    0 0 60px 30px rgba(var(--accent-main), 0.6),
-    0 0 120px 60px rgba(var(--accent-main), 0.4),
-    0 0 200px 100px rgba(var(--accent-main), 0.2);
+    0 0 24px 8px rgba(255, 255, 255, 0.42),
+    0 0 52px 18px rgba(var(--accent-main), 0.26);
   z-index: 4;
   opacity: 0;
   transition: width 0.15s cubic-bezier(0.1, 0, 0.3, 1), opacity 0.3s;
   pointer-events: none;
-  mix-blend-mode: multiply;
+  mix-blend-mode: screen;
+}
+
+.summon-rift::before,
+.summon-rift::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.summon-rift::before {
+  width: 72vmax;
+  height: 135vmax;
+  background:
+    radial-gradient(ellipse at 50% 50%, rgba(255, 255, 255, 0.34) 0%, rgba(var(--accent-cold), 0.26) 8%, rgba(var(--accent-soft), 0.18) 22%, rgba(var(--accent-main), 0.12) 38%, transparent 68%),
+    radial-gradient(ellipse at 50% 50%, rgba(var(--accent-main), 0.16) 0%, transparent 62%);
+  opacity: var(--rift-bloom-alpha);
+  filter: blur(28px);
+  transform: translate(-50%, -50%) scale(var(--rift-bloom-scale));
+}
+
+.summon-rift::after {
+  width: 170vmax;
+  height: 170vmax;
+  background:
+    conic-gradient(from -90deg at 50% 50%, transparent 0deg, rgba(var(--accent-soft), 0.12) 18deg, transparent 42deg, rgba(var(--accent-main), 0.18) 72deg, transparent 108deg, rgba(var(--accent-soft), 0.12) 138deg, transparent 180deg, rgba(var(--accent-soft), 0.12) 198deg, transparent 222deg, rgba(var(--accent-main), 0.18) 252deg, transparent 288deg, rgba(var(--accent-soft), 0.12) 318deg, transparent 360deg),
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.18) 0%, transparent 18%);
+  opacity: var(--rift-fan-alpha);
+  filter: blur(22px);
 }
 
 .summon-gate-left,
@@ -672,8 +706,8 @@ body.fx-mobile #main-bg-canvas {
 .gate-seal-base {
   width: 320px;
   height: 320px;
-  border: 2px dashed rgba(var(--accent-main), 0.4);
-  background: radial-gradient(circle, rgba(var(--accent-main), 0.1) 0%, transparent 60%);
+  border: 2px dashed rgba(255, 255, 255, 0.55);
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.12) 0%, transparent 60%);
 }
 
 .gate-seal-inner {
@@ -713,6 +747,9 @@ body.fx-mobile #main-bg-canvas {
 #summon-overlay.phase-charge .summon-rift {
   opacity: 1;
   --rift-width: 28px; /* Wider initial rift for premium feel */
+  --rift-bloom-alpha: 0.62;
+  --rift-bloom-scale: 0.82;
+  --rift-fan-alpha: 0.34;
   animation: rift-pulse 0.08s infinite alternate;
 }
 
@@ -723,6 +760,9 @@ body.fx-mobile #main-bg-canvas {
 #summon-overlay.phase-compress .summon-rift {
   opacity: 1;
   --rift-width: 14px; /* Light condensed but still visible */
+  --rift-bloom-alpha: 0.9;
+  --rift-bloom-scale: 1.08;
+  --rift-fan-alpha: 0.52;
   box-shadow: 
     0 0 80px 40px rgba(255, 255, 255, 1),
     0 0 180px 90px rgba(var(--accent-main), 1),
@@ -755,6 +795,9 @@ body.fx-mobile #main-bg-canvas {
 #summon-overlay.phase-tear .summon-rift {
   opacity: 1;
   --rift-width: 150vw;
+  --rift-bloom-alpha: 1;
+  --rift-bloom-scale: 2.3;
+  --rift-fan-alpha: 0.86;
   transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -1155,6 +1198,7 @@ body.fx-lite .impact-halo {
 }
 
 .reveal-backdrop {
+  overflow: hidden;
   background:
     radial-gradient(circle at 50% 46%, rgba(var(--accent-main), 0.14) 0%, transparent 26%),
     linear-gradient(180deg, rgba(255, 248, 231, 1) 0%, rgba(248, 233, 204, 1) 34%, rgba(244, 224, 186, 1) 100%);
@@ -1163,14 +1207,68 @@ body.fx-lite .impact-halo {
 /* More Powerful Contrast for Reveal */
 #card-reveal-overlay[data-rarity="hard"] .reveal-backdrop {
   background:
-    radial-gradient(circle at 50% 46%, rgba(255, 220, 80, 0.45) 0%, transparent 60%),
+    radial-gradient(circle at 50% 46%, rgba(255, 220, 80, 0.58) 0%, rgba(255, 214, 102, 0.24) 34%, transparent 72%),
+    radial-gradient(circle at 18% 18%, rgba(255, 245, 200, 0.24) 0%, transparent 34%),
+    radial-gradient(circle at 82% 20%, rgba(255, 208, 84, 0.18) 0%, transparent 28%),
     linear-gradient(180deg, #fffcf0 0%, #fff9e6 34%, #fff5d1 100%);
+}
+
+#card-reveal-overlay[data-rarity="hard"] .reveal-backdrop::before,
+#card-reveal-overlay[data-rarity="hard"] .reveal-backdrop::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
+#card-reveal-overlay[data-rarity="hard"] .reveal-backdrop::before {
+  inset: -26vmax;
+  background:
+    radial-gradient(circle at 50% 46%, rgba(255, 214, 92, 0.22) 0%, rgba(255, 196, 46, 0.14) 28%, transparent 62%),
+    conic-gradient(from 0deg at 50% 46%, rgba(255, 245, 210, 0.16) 0deg, transparent 58deg, rgba(255, 196, 46, 0.18) 116deg, transparent 184deg, rgba(255, 234, 156, 0.16) 248deg, transparent 360deg);
+  opacity: 0.96;
+  animation: hard-backdrop-pulse 7.2s ease-in-out infinite alternate;
+}
+
+#card-reveal-overlay[data-rarity="hard"] .reveal-backdrop::after {
+  inset: -14vmax;
+  background:
+    radial-gradient(circle at 50% 48%, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.08) 16%, transparent 36%),
+    radial-gradient(circle at 50% 50%, transparent 0%, rgba(255, 220, 104, 0.1) 46%, rgba(255, 194, 46, 0.14) 68%, transparent 96%);
+  mix-blend-mode: screen;
+  opacity: 0.82;
 }
 
 #card-reveal-overlay[data-rarity="epic"] .reveal-backdrop {
   background:
-    radial-gradient(circle at 50% 46%, rgba(255, 60, 100, 0.4) 0%, transparent 60%),
+    radial-gradient(circle at 50% 46%, rgba(255, 60, 100, 0.48) 0%, rgba(255, 90, 130, 0.18) 44%, transparent 78%),
+    radial-gradient(circle at 18% 20%, rgba(255, 170, 196, 0.22) 0%, transparent 40%),
+    radial-gradient(circle at 82% 22%, rgba(255, 120, 168, 0.2) 0%, transparent 36%),
     linear-gradient(180deg, #fff5f7 0%, #fff0f3 34%, #ffe5ea 100%);
+}
+
+#card-reveal-overlay[data-rarity="epic"] .reveal-backdrop::before,
+#card-reveal-overlay[data-rarity="epic"] .reveal-backdrop::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
+#card-reveal-overlay[data-rarity="epic"] .reveal-backdrop::before {
+  inset: -30vmax;
+  background:
+    radial-gradient(circle at 50% 46%, rgba(255, 60, 100, 0.3) 0%, rgba(255, 100, 148, 0.2) 26%, rgba(255, 150, 186, 0.1) 52%, transparent 76%),
+    conic-gradient(from 0deg at 50% 46%, rgba(255, 60, 100, 0.16) 0deg, transparent 62deg, rgba(255, 155, 182, 0.18) 118deg, transparent 186deg, rgba(255, 92, 132, 0.16) 244deg, transparent 360deg);
+  opacity: 0.96;
+  animation: epic-backdrop-drift 10s ease-in-out infinite alternate;
+}
+
+#card-reveal-overlay[data-rarity="epic"] .reveal-backdrop::after {
+  inset: -18vmax;
+  background:
+    radial-gradient(circle at 50% 48%, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.08) 18%, transparent 42%),
+    radial-gradient(circle at 50% 50%, transparent 0%, rgba(255, 128, 168, 0.08) 52%, rgba(255, 78, 124, 0.12) 74%, transparent 100%);
+  mix-blend-mode: screen;
+  opacity: 0.9;
 }
 
 .reveal-beams-bg {
@@ -1192,20 +1290,27 @@ body.fx-lite .impact-halo {
 }
 
 #card-reveal-overlay[data-rarity="hard"].active .reveal-beams-bg {
+  inset: -62vmax;
   opacity: 0.8;
   background: conic-gradient(
     from 0deg,
     transparent 0deg,
-    rgba(255, 255, 255, 0.3) 10deg,
-    transparent 20deg,
-    rgba(255, 194, 46, 0.5) 40deg,
-    transparent 60deg,
-    rgba(255, 215, 0, 0.3) 90deg,
-    transparent 120deg
+    rgba(255, 255, 255, 0.34) 8deg,
+    transparent 18deg,
+    rgba(255, 194, 46, 0.52) 36deg,
+    transparent 52deg,
+    rgba(255, 232, 148, 0.24) 78deg,
+    transparent 94deg,
+    rgba(255, 194, 46, 0.44) 132deg,
+    transparent 152deg,
+    rgba(255, 248, 214, 0.24) 186deg,
+    transparent 214deg
   );
+  animation: beam-spin 5.5s linear infinite;
 }
 
 #card-reveal-overlay[data-rarity="epic"].active .reveal-beams-bg {
+  inset: -72vmax;
   opacity: 0.9;
   background: conic-gradient(
     from 0deg,
@@ -1223,12 +1328,30 @@ body.fx-lite .impact-halo {
   animation: beam-spin 4s linear infinite;
 }
 
+@keyframes epic-backdrop-drift {
+  0% { transform: scale(1) rotate(0deg); }
+  100% { transform: scale(1.08) rotate(14deg); }
+}
+
+@keyframes hard-backdrop-pulse {
+  0% { transform: scale(1) rotate(0deg); opacity: 0.88; }
+  100% { transform: scale(1.05) rotate(10deg); opacity: 1; }
+}
+
 .reveal-horizon {
   top: 50%;
   height: 2px;
   background: linear-gradient(90deg, transparent 0%, rgba(var(--accent-main), 0.84) 50%, transparent 100%);
   box-shadow: 0 0 36px rgba(var(--accent-main), 0.42);
   opacity: 0.28;
+}
+
+#card-reveal-overlay[data-rarity="hard"] .reveal-horizon {
+  height: 3px;
+  opacity: 0.5;
+  box-shadow:
+    0 0 36px rgba(255, 220, 120, 0.6),
+    0 0 88px rgba(255, 194, 46, 0.32);
 }
 
 .reveal-runway {
@@ -1241,6 +1364,15 @@ body.fx-lite .impact-halo {
   transform-origin: 50% 100%;
   transform: perspective(1000px) rotateX(76deg) scaleY(1.45);
   opacity: 0.36;
+}
+
+#card-reveal-overlay[data-rarity="hard"] .reveal-runway {
+  height: 78vh;
+  opacity: 0.52;
+  background:
+    linear-gradient(180deg, transparent 0%, rgba(255, 194, 46, 0.18) 100%),
+    repeating-linear-gradient(90deg, rgba(255, 229, 152, 0.2) 0 2px, transparent 2px 7vw),
+    repeating-linear-gradient(180deg, rgba(255, 194, 46, 0.18) 0 2px, transparent 2px 7vh);
 }
 
 .reveal-rings {
@@ -1267,6 +1399,13 @@ body.fx-lite .impact-halo {
 .reveal-frame-c {
   width: min(48vmin, 420px);
   border-color: rgba(255, 255, 255, 0.4);
+}
+
+#card-reveal-overlay[data-rarity="hard"] .reveal-frame {
+  border-color: rgba(255, 226, 146, 0.64);
+  box-shadow:
+    0 0 46px rgba(255, 210, 90, 0.26),
+    0 0 110px rgba(255, 194, 46, 0.14);
 }
 
 #card-reveal-overlay.impacting .reveal-frame-a {
@@ -1320,11 +1459,11 @@ body.fx-lite .card-char-pop {
 
 #reveal-title-wrap {
   position: absolute;
-  top: 8%;
+  top: calc(env(safe-area-inset-top, 0px) + 18px);
   left: 50%;
   transform: translateX(-50%) translateY(20px);
   text-align: center;
-  z-index: 5;
+  z-index: 24;
   width: 100%;
   opacity: 0;
   pointer-events: none;
