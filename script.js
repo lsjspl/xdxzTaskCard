@@ -26,36 +26,36 @@ const RARITY_THEME = {
     easy: {
         label: '简单',
         stars: '★ ★',
-        card: 'card_back.webp',
-        bg: 'bg_easy.jpg',
-        char: 'char_1.webp',
+        card: 'img/card_back.webp',
+        bg: 'img/bg_easy.jpg',
+        char: 'img/char_1.webp',
         fallbackTask: '去喷泉边散散步',
         fx: ['112, 196, 255', '168, 221, 255', '224, 244, 255']
     },
     normal: {
         label: '普通',
         stars: '★ ★ ★',
-        card: 'card_back.webp',
-        bg: 'bg_normal.jpg',
-        char: 'char_2.webp',
+        card: 'img/card_back.webp',
+        bg: 'img/bg_normal.jpg',
+        char: 'img/char_2.webp',
         fallbackTask: '收下一份今天的惊喜',
         fx: ['180, 100, 255', '210, 160, 255', '240, 230, 255']
     },
     hard: {
         label: '困难',
         stars: '★ ★ ★ ★',
-        card: 'card_back.webp',
-        bg: 'bg_hard.jpg',
-        char: 'char_3.webp',
+        card: 'img/card_back.webp',
+        bg: 'img/bg_hard.jpg',
+        char: 'img/char_3.webp',
         fallbackTask: '挑战一次困难任务',
         fx: ['255, 194, 46', '255, 231, 138', '255, 248, 216']
     },
     epic: {
         label: '史诗',
         stars: '★ ★ ★ ★ ★',
-        card: 'card_back.webp',
-        bg: 'bg_hard.jpg',
-        char: 'char_6.webp',
+        card: 'img/card_back.webp',
+        bg: 'img/bg_hard.jpg',
+        char: 'img/char_6.webp',
         fallbackTask: '完成一次不可思议的史诗任务',
         fx: ['255, 60, 100', '255, 140, 160', '255, 200, 210']
     }
