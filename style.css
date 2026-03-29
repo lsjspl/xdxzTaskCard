@@ -407,6 +407,9 @@ body {
 #summon-overlay {
   --rift-open: 0.08;
   --rift-glow: 0.34;
+  --bridge-alpha: 0;
+  --bridge-x: 50vw;
+  --bridge-y: 46vh;
   --shell-shift: 18px;
   --shell-tilt: 0deg;
   --shutter-gap: 28vh;
@@ -418,6 +421,21 @@ body {
   pointer-events: none;
   transition: opacity 0.34s ease;
   transform: translate(var(--shake-x, 0), var(--shake-y, 0));
+}
+
+#summon-overlay::before {
+  content: "";
+  position: absolute;
+  inset: -20%;
+  pointer-events: none;
+  opacity: var(--bridge-alpha);
+  z-index: 8;
+  background:
+    radial-gradient(circle at var(--bridge-x) var(--bridge-y), rgba(var(--accent-soft), 0.62) 0%, rgba(var(--accent-main), 0.34) 12%, transparent 34%),
+    conic-gradient(from 45deg at var(--bridge-x) var(--bridge-y), transparent 0deg, rgba(var(--accent-main), 0.2) 18deg, transparent 46deg, rgba(var(--accent-cold), 0.26) 88deg, transparent 134deg, rgba(var(--accent-main), 0.18) 188deg, transparent 360deg);
+  filter: blur(10px);
+  mix-blend-mode: screen;
+  transition: opacity 0.28s ease;
 }
 
 #summon-overlay.active {
@@ -440,6 +458,11 @@ body {
 
 #summon-overlay.phase-tear .summon-backdrop::before,
 #summon-overlay.phase-tear .summon-backdrop::after {
+  opacity: 1;
+}
+
+#summon-overlay.phase-bridge .summon-backdrop::before,
+#summon-overlay.phase-bridge .summon-backdrop::after {
   opacity: 1;
 }
 
@@ -562,6 +585,16 @@ body {
 #summon-overlay.phase-tear .summon-gate-left,
 #summon-overlay.phase-tear .summon-gate-right {
   opacity: 1; /* GSAP will handle transform */
+}
+
+#summon-overlay.phase-bridge {
+  --bridge-alpha: 1;
+}
+
+#summon-overlay.phase-bridge .summon-gate-left,
+#summon-overlay.phase-bridge .summon-gate-right {
+  opacity: 0.2;
+  filter: blur(1.5px) saturate(1.08);
 }
 
 .summon-rift-core {
@@ -687,9 +720,20 @@ body {
   --rift-glow: 2.2;
 }
 
+#summon-overlay.phase-bridge {
+  --shutter-gap: -30vh;
+  --rift-open: 1.4;
+  --rift-glow: 2.6;
+}
+
 #summon-overlay.phase-tear .summon-card-shell {
   opacity: 0;
   transform: translateY(-48px) scale(1.18);
+}
+
+#summon-overlay.phase-bridge .summon-card-shell {
+  opacity: 0;
+  transform: translateY(-96px) scale(1.28);
 }
 
 #summon-fx-canvas {

@@ -573,8 +573,10 @@ async function ensureGyroTiltAccess() {
 }
 
 function clearSummonScene() {
-    summonOverlay.classList.remove('active', 'phase-charge', 'phase-compress', 'phase-tear');
+    summonOverlay.classList.remove('active', 'phase-charge', 'phase-compress', 'phase-tear', 'phase-bridge');
     summonOverlay.style.removeProperty('--gate-open');
+    summonOverlay.style.removeProperty('--bridge-x');
+    summonOverlay.style.removeProperty('--bridge-y');
 }
 
 function resetRevealScene() {
@@ -722,6 +724,7 @@ class SummonFxEngine {
         this.inward = [];
         this.burst = [];
         this.waves = [];
+        this.bridgeTarget = null;
         this.rafId = 0;
         this.resize();
         window.addEventListener('resize', () => this.resize());
@@ -747,6 +750,7 @@ class SummonFxEngine {
         this.inward = [];
         this.burst = [];
         this.waves = [];
+        this.bridgeTarget = null;
         this.animate();
     }
 
@@ -781,7 +785,17 @@ class SummonFxEngine {
                 this.spawnWave(120, 0.8, 8);
                 this.spawnWave(180, 0.4, 12);
             }
+        } else if (phase === 'bridge') {
+            this.spawnWave(72, 0.52, 4.4);
         }
+    }
+
+    setBridgeTarget(x, y) {
+        if (!Number.isFinite(x) || !Number.isFinite(y)) {
+            this.bridgeTarget = null;
+            return;
+        }
+        this.bridgeTarget = { x, y };
     }
 
     seedAmbient() {
@@ -1012,6 +1026,25 @@ class SummonFxEngine {
             this.ctx.restore();
             return wave.alpha > 0.02;
         });
+
+        if (this.bridgeTarget && (this.phase === 'tear' || this.phase === 'bridge')) {
+            const beamAlpha = this.phase === 'bridge' ? 0.4 : 0.26;
+            const bridgeStroke = this.ctx.createLinearGradient(centerX, centerY, this.bridgeTarget.x, this.bridgeTarget.y);
+            bridgeStroke.addColorStop(0, `rgba(${this.palette[1]},${beamAlpha})`);
+            bridgeStroke.addColorStop(0.6, `rgba(${this.palette[0]},${beamAlpha * 0.72})`);
+            bridgeStroke.addColorStop(1, `rgba(${this.palette[2]},0)`);
+            this.ctx.strokeStyle = bridgeStroke;
+            this.ctx.lineWidth = this.phase === 'bridge' ? 7.5 : 4.2;
+            this.ctx.lineCap = 'round';
+            this.ctx.shadowBlur = this.phase === 'bridge' ? 30 : 20;
+            this.ctx.shadowColor = `rgba(${this.palette[1]},${beamAlpha})`;
+            this.ctx.beginPath();
+            this.ctx.moveTo(centerX, centerY);
+            const controlX = lerp(centerX, this.bridgeTarget.x, 0.45);
+            const controlY = Math.min(centerY, this.bridgeTarget.y) - (this.phase === 'bridge' ? 86 : 52);
+            this.ctx.quadraticCurveTo(controlX, controlY, this.bridgeTarget.x, this.bridgeTarget.y);
+            this.ctx.stroke();
+        }
         this.ctx.restore();
         this.rafId = requestAnimationFrame(this.animate);
     };
@@ -1271,6 +1304,8 @@ async function triggerSummon() {
         const destiny = drawDestiny();
         const fxRarity = getFxRarity();
         const retrying = cardRevealOverlay.classList.contains('active');
+        const bridgeTargetX = window.innerWidth / 2;
+        const bridgeTargetY = window.innerHeight * 0.46;
         applyDestinySkin(destiny);
         if (retrying) await collapseReveal();
 
@@ -1283,8 +1318,11 @@ async function triggerSummon() {
             onStart: () => {
                 clearSummonScene();
                 summonOverlay.classList.add('active');
+                summonOverlay.style.setProperty('--bridge-x', `${bridgeTargetX}px`);
+                summonOverlay.style.setProperty('--bridge-y', `${bridgeTargetY}px`);
                 whiteFlash.style.opacity = '0';
                 summonFx.start(fxRarity);
+                summonFx.setBridgeTarget(bridgeTargetX, bridgeTargetY);
                 // Force reset with standard GSAP properties
                 gsap.set(theCard, { rotationX: 0, rotationY: 0, rotationZ: 0, z: 0, scale: 1 });
                 gsap.set(cardInnerWrap, { rotationY: 0 });
@@ -1314,6 +1352,10 @@ async function triggerSummon() {
                 setTimeout(triggerImpactFrame, 80);
             }
         }).to(summonOverlay, { "--gate-open": "-30vw", duration: 0.38, ease: "expo.in" })
+            .add(() => {
+                summonOverlay.classList.add('phase-bridge');
+                summonFx.setPhase('bridge');
+            }, "-=0.08")
             .to(whiteFlash, { opacity: 1, duration: 0.08 })
             .add(() => {
                 if (fxRarity === 'hard') triggerImpactFrame();
