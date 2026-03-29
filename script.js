@@ -55,7 +55,7 @@ const RARITY_THEME = {
         fx: ['255, 194, 46', '255, 231, 138', '255, 248, 216']
     },
     epic: {
-        label: '史诗',
+        label: '极难',
         stars: '★ ★ ★ ★ ★',
         card: 'img/card_back.webp',
         bg: 'img/bg_hard.jpg',
@@ -240,7 +240,7 @@ async function loadTasks() {
             } else if ((match = lower.match(/^##\s*(hard|困难)\s*(?:\[(\d+)\])?/))) {
                 currentCategory = 'hard';
                 if (match[2]) RARITY_WEIGHTS.hard = parseInt(match[2], 10);
-            } else if ((match = lower.match(/^##\s*(epic|史诗)\s*(?:\[(\d+)\])?/))) {
+            } else if ((match = lower.match(/^##\s*(epic|极难)\s*(?:\[(\d+)\])?/))) {
                 currentCategory = 'epic';
                 if (match[2]) RARITY_WEIGHTS.epic = parseInt(match[2], 10);
             } else if (trimmed.startsWith('- ') && currentCategory) {
