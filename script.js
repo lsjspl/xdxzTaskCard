@@ -118,9 +118,9 @@ function buildPerformanceProfile() {
     const isMobileViewport = window.innerWidth <= 768;
     const lowMemory = typeof navigator !== 'undefined' && Number.isFinite(navigator.deviceMemory) && navigator.deviceMemory <= 4;
     const lowCpu = typeof navigator !== 'undefined' && Number.isFinite(navigator.hardwareConcurrency) && navigator.hardwareConcurrency <= 4;
-    const coarsePointer = window.matchMedia?.('(pointer: coarse)').matches ?? (navigator.maxTouchPoints > 0);
-    const liteFx = Boolean(reducedMotion || lowMemory || lowCpu || (isMobileViewport && coarsePointer));
-    const fxDensity = reducedMotion ? 0.28 : liteFx ? 0.52 : isMobileViewport ? 0.76 : 1;
+    const coarsePointer = window.matchMedia?.('(pointer: coarse)').matches ?? ((navigator?.maxTouchPoints ?? 0) > 0);
+    const liteFx = Boolean(reducedMotion || lowMemory || lowCpu);
+    const fxDensity = reducedMotion ? 0.28 : liteFx ? (isMobileViewport ? 0.66 : 0.58) : isMobileViewport ? 0.9 : 1;
 
     return {
         isMobileViewport,
@@ -130,9 +130,9 @@ function buildPerformanceProfile() {
         coarsePointer,
         liteFx,
         fxDensity,
-        backgroundFps: reducedMotion ? 18 : liteFx ? 24 : isMobileViewport ? 30 : 45,
-        summonFps: reducedMotion ? 20 : liteFx ? 30 : 60,
-        revealFps: reducedMotion ? 20 : liteFx ? 30 : 60
+        backgroundFps: reducedMotion ? 18 : liteFx ? (isMobileViewport ? 32 : 28) : isMobileViewport ? 40 : 45,
+        summonFps: reducedMotion ? 20 : liteFx ? 42 : isMobileViewport ? 54 : 60,
+        revealFps: reducedMotion ? 20 : liteFx ? 42 : isMobileViewport ? 54 : 60
     };
 }
 
@@ -827,6 +827,236 @@ function triggerImpactFrame(rarity = 'hard') {
             }
         }
     );
+}
+
+function isHighRarity(rarity) {
+    return rarity === 'hard' || rarity === 'epic';
+}
+
+function queueScreenShakes(sequence) {
+    sequence.forEach(({ intensity, delay = 0 }) => {
+        if (delay > 0) {
+            setTimeout(() => triggerShake(intensity), delay);
+            return;
+        }
+        triggerShake(intensity);
+    });
+}
+
+function triggerTearBurst(rarity) {
+    triggerShake('heavy');
+    if (!isHighRarity(rarity)) return;
+
+    triggerImpactFrame(rarity);
+    setTimeout(() => triggerImpactFrame(rarity), 80);
+
+    if (rarity === 'epic') {
+        setTimeout(() => triggerImpactFrame(rarity), 160);
+        setTimeout(() => triggerShake('heavy'), 200);
+    }
+}
+
+function prepareSummonScene(initialFxRarity, bridgeTargetX, bridgeTargetY) {
+    clearSummonScene();
+    interactionEngine.resetHome();
+    gsap.set(summonOverlay, { scale: 1 });
+    summonOverlay.classList.add('active');
+    summonOverlay.style.setProperty('--bridge-x', `${bridgeTargetX}px`);
+    summonOverlay.style.setProperty('--bridge-y', `${bridgeTargetY}px`);
+    whiteFlash.style.opacity = '0';
+    summonFx.start(initialFxRarity);
+    summonFx.setBridgeTarget(bridgeTargetX, bridgeTargetY);
+    gsap.set(theCard, { rotationX: 0, rotationY: 0, rotationZ: 0, z: 0, scale: 1 });
+    gsap.set(cardInnerWrap, { rotationY: 0 });
+}
+
+function getSummonViewportMetrics() {
+    const viewportHeight = typeof window === 'undefined' ? 900 : window.innerHeight;
+    const isMobileViewport = PERFORMANCE_PROFILE.isMobileViewport;
+    return {
+        chargeGateOpen: isMobileViewport ? "49.2vw" : "49vw",
+        chargeScale: isMobileViewport ? 1.12 : 1.18,
+        compressGateOpen: isMobileViewport ? "49.6vw" : "49.5vw",
+        compressScale: isMobileViewport ? 1.1 : 1.15,
+        tearGateOpen: isMobileViewport ? "-42vw" : "-45vw",
+        revealStartY: Math.max(Math.round(viewportHeight * (isMobileViewport ? 1.08 : 1.22)), 760),
+        revealOvershootY: isMobileViewport ? -56 : -80,
+        flipLiftZ: isMobileViewport ? 108 : 130,
+        flipScale: isMobileViewport ? 1.035 : 1.05
+    };
+}
+
+function addSummonPreparationPhase(timeline, context) {
+    const { initialFxRarity, bridgeTargetX, bridgeTargetY } = context;
+    return timeline.to(mainScreen, {
+        opacity: 0,
+        scale: 0.92,
+        duration: 0.4,
+        onStart: () => prepareSummonScene(initialFxRarity, bridgeTargetX, bridgeTargetY)
+    });
+}
+
+function addSummonChargePhase(timeline) {
+    const metrics = getSummonViewportMetrics();
+    return timeline
+        .add(() => {
+            summonOverlay.classList.add('phase-charge');
+            summonFx.setPhase('charge');
+            summonFx.setIntensity(2.0);
+            queueScreenShakes([
+                { intensity: 'light' },
+                { intensity: 'light', delay: 400 },
+                { intensity: 'medium', delay: 800 },
+                { intensity: 'heavy', delay: 1200 }
+            ]);
+        })
+        .fromTo(
+            summonOverlay,
+            { scale: 1, "--gate-open": "50vw" },
+            { "--gate-open": metrics.chargeGateOpen, scale: metrics.chargeScale, duration: 1.8, ease: "power2.in" }
+        );
+}
+
+function addSummonCompressPhase(timeline) {
+    const metrics = getSummonViewportMetrics();
+    return timeline
+        .add(() => {
+            summonOverlay.classList.add('phase-compress');
+            summonFx.setPhase('compress');
+            summonFx.setIntensity(5.0);
+        })
+        .to(summonOverlay, {
+            "--gate-open": metrics.compressGateOpen,
+            scale: metrics.compressScale,
+            duration: 0.15,
+            ease: "power4.out"
+        });
+}
+
+function addSummonTearPhase(timeline, context) {
+    const { initialFxRarity } = context;
+    const metrics = getSummonViewportMetrics();
+    return timeline
+        .add(() => {
+            summonOverlay.classList.add('phase-tear');
+            summonFx.setPhase('tear');
+            summonFx.setIntensity(initialFxRarity === 'epic' ? 9.0 : initialFxRarity === 'hard' ? 7.0 : 5.0);
+            triggerTearBurst(initialFxRarity);
+        })
+        .to(summonOverlay, {
+            "--gate-open": metrics.tearGateOpen,
+            scale: 1,
+            duration: 0.55,
+            ease: "expo.out"
+        })
+        .add(() => {
+            summonOverlay.classList.add('phase-bridge');
+            summonFx.setPhase('bridge');
+        }, "-=0.08")
+        .to(whiteFlash, { opacity: 1, duration: 0.08 })
+        .add(() => {
+            if (initialFxRarity === 'hard') triggerImpactFrame('hard');
+            resetRevealScene();
+        });
+}
+
+function addRevealArrivalPhase(timeline, context) {
+    const { finalRarity } = context;
+    const metrics = getSummonViewportMetrics();
+    return timeline
+        .set(cardRevealOverlay, { opacity: 1, pointerEvents: "auto" }, "+=0.04")
+        .add(() => {
+            cardRevealOverlay.classList.add('active', 'impacting');
+            cardStage.classList.add('materializing');
+            gsap.set(cardStage, { xPercent: -50, yPercent: -50 });
+            resetGyroBaseline();
+            logTiltDebug('reveal/activated', {}, { force: true });
+        })
+        .fromTo(
+            cardStage,
+            { y: metrics.revealStartY, scale: 0.1, rotateX: 70, opacity: 0, filter: "blur(40px)" },
+            { y: metrics.revealOvershootY, scale: 1.25, rotateX: -18, opacity: 1, filter: "blur(0px)", duration: 0.52, ease: "power4.in" }
+        )
+        .addLabel("slam-moment")
+        .add(() => {
+            triggerShake(isHighRarity(finalRarity) ? 'heavy' : 'medium');
+            if (finalRarity === 'epic') {
+                triggerImpactFrame();
+                setTimeout(triggerImpactFrame, 60);
+            }
+            summonFx.stop();
+            clearSummonScene();
+        }, "slam-moment")
+        .to(cardStage, {
+            y: 0,
+            scale: 1,
+            rotateX: 0,
+            duration: 0.75,
+            ease: "elastic.out(1, 0.42)"
+        }, "slam-moment");
+}
+
+function addRevealPresentationPhase(timeline, context) {
+    const { initialFxRarity } = context;
+    return timeline
+        .to(whiteFlash, { opacity: 0, duration: 0.9 }, "slam-moment+=0.1")
+        .add(() => {
+            cardStage.classList.remove('materializing');
+            cardStage.classList.add('presented');
+            resetGyroBaseline();
+            logTiltDebug('reveal/presented', {}, { force: true });
+        })
+        .add(() => revealFx.start(initialFxRarity, cardStage.getBoundingClientRect()))
+        .to({}, {
+            duration: 0.5,
+            onComplete: () => {
+                cardRevealOverlay.classList.remove('impacting');
+                logTiltDebug('reveal/impacting-removed', {}, { force: true });
+            }
+        });
+}
+
+function addRevealFlipPhase(timeline) {
+    const metrics = getSummonViewportMetrics();
+    return timeline
+        .addLabel("flip-start", "+=0.3")
+        .add(() => {
+            theCard.classList.add('is-flipped');
+            logTiltDebug('flip/start', {}, { force: true });
+        }, "flip-start")
+        .to(cardInnerWrap, {
+            rotationY: 180,
+            duration: 1.05,
+            ease: "back.out(1.15)",
+            overwrite: "auto"
+        }, "flip-start")
+        .to(theCard, {
+            z: metrics.flipLiftZ,
+            scale: metrics.flipScale,
+            duration: 0.85,
+            ease: "back.out(1.2)"
+        }, "flip-start")
+        .to(cardGlare, { x: "100%", duration: 1.2, ease: "power2.inOut" }, "flip-start+=0.1")
+        .to(theCard, {
+            z: 0,
+            scale: 1,
+            duration: 0.5,
+            ease: "elastic.out(1, 0.6)"
+        }, "-=0.2")
+        .add(() => retryBtn.classList.add('active'), "+=0.1")
+        .to(retryBtn, { autoAlpha: 1, y: 0, duration: 0.5, ease: "power2.out" }, "-=0.2");
+}
+
+function createSummonTimeline(context) {
+    const timeline = gsap.timeline({ defaults: { ease: "power2.inOut" } });
+    addSummonPreparationPhase(timeline, context);
+    addSummonChargePhase(timeline);
+    addSummonCompressPhase(timeline);
+    addSummonTearPhase(timeline, context);
+    addRevealArrivalPhase(timeline, context);
+    addRevealPresentationPhase(timeline, context);
+    addRevealFlipPhase(timeline);
+    return timeline;
 }
 
 async function collapseReveal() {
@@ -1560,160 +1790,18 @@ async function triggerSummon() {
         await ensureGyroTiltAccess();
         const destiny = drawDestiny();
         const finalRarity = destiny.rarity;
-        
         let initialFxRarity = finalRarity;
-
         const retrying = cardRevealOverlay.classList.contains('active');
         const bridgeTargetX = window.innerWidth / 2;
         const bridgeTargetY = window.innerHeight * 0.46;
         applyDestinySkin(destiny, initialFxRarity);
         if (retrying) await collapseReveal();
-
-        const mainTl = gsap.timeline({ defaults: { ease: "power2.inOut" } });
-
-        mainTl.to(mainScreen, {
-            opacity: 0,
-            scale: 0.92,
-            duration: 0.4,
-            onStart: () => {
-                clearSummonScene();
-                interactionEngine.resetHome();
-                // Ensure scale starts normal to prepare for camera zoom
-                gsap.set(summonOverlay, { scale: 1 });
-                summonOverlay.classList.add('active');
-                summonOverlay.style.setProperty('--bridge-x', `${bridgeTargetX}px`);
-                summonOverlay.style.setProperty('--bridge-y', `${bridgeTargetY}px`);
-                whiteFlash.style.opacity = '0';
-                summonFx.start(initialFxRarity);
-                summonFx.setBridgeTarget(bridgeTargetX, bridgeTargetY);
-                // Force reset with standard GSAP properties
-                gsap.set(theCard, { rotationX: 0, rotationY: 0, rotationZ: 0, z: 0, scale: 1 });
-                gsap.set(cardInnerWrap, { rotationY: 0 });
-            }
+        const mainTl = createSummonTimeline({
+            initialFxRarity,
+            finalRarity,
+            bridgeTargetX,
+            bridgeTargetY
         });
-
-        // Phase 1: Charge (The Struggle) - Intense camera push, door barely cracks, heavy vibrations
-        mainTl.add(() => {
-            summonOverlay.classList.add('phase-charge');
-            summonFx.setPhase('charge');
-            summonFx.setIntensity(2.0);
-            triggerShake('light');
-            setTimeout(() => triggerShake('light'), 400);
-            setTimeout(() => triggerShake('medium'), 800);
-            setTimeout(() => triggerShake('heavy'), 1200);
-        }).fromTo(summonOverlay, 
-            { scale: 1, "--gate-open": "50vw" }, 
-            { "--gate-open": "49vw", scale: 1.18, duration: 1.8, ease: "power2.in" }
-        );
-
-        // Phase 2: Compress (The Silence) - Freeze and blinding anticipation
-        mainTl.add(() => {
-            summonOverlay.classList.add('phase-compress');
-            summonFx.setPhase('compress');
-            summonFx.setIntensity(5.0);
-        }).to(summonOverlay, { 
-            "--gate-open": "49.5vw", 
-            scale: 1.15, 
-            duration: 0.15, 
-            ease: "power4.out" 
-        });
-
-        // Phase 3: Tear (The Burst) - Explosive velocity, snapping the camera back
-        mainTl.add(() => {
-            summonOverlay.classList.add('phase-tear');
-            summonFx.setPhase('tear');
-            const isHighRarity = initialFxRarity === 'hard' || initialFxRarity === 'epic';
-            summonFx.setIntensity(initialFxRarity === 'epic' ? 9.0 : initialFxRarity === 'hard' ? 7.0 : 5.0);
-            triggerShake('heavy');
-            if (isHighRarity) {
-                triggerImpactFrame(initialFxRarity);
-                setTimeout(() => triggerImpactFrame(initialFxRarity), 80);
-                if (initialFxRarity === 'epic') {
-                    setTimeout(() => triggerImpactFrame(initialFxRarity), 160);
-                    setTimeout(() => triggerShake('heavy'), 200);
-                }
-            }
-        }).to(summonOverlay, { 
-            "--gate-open": "-45vw", 
-            scale: 1, 
-            duration: 0.55, 
-            ease: "expo.out" 
-        })
-            .add(() => {
-                summonOverlay.classList.add('phase-bridge');
-                summonFx.setPhase('bridge');
-            }, "-=0.08")
-            .to(whiteFlash, { opacity: 1, duration: 0.08 })
-            .add(() => {
-                if (initialFxRarity === 'hard') triggerImpactFrame('hard');
-                resetRevealScene();
-            });
-
-        mainTl.set(cardRevealOverlay, { opacity: 1, pointerEvents: "auto" }, "+=0.04")
-            .add(() => {
-                cardRevealOverlay.classList.add('active', 'impacting');
-                cardStage.classList.add('materializing');
-                gsap.set(cardStage, { xPercent: -50, yPercent: -50 });
-                resetGyroBaseline();
-                logTiltDebug('reveal/activated', {}, { force: true });
-            })
-            .fromTo(cardStage,
-                { y: 1200, scale: 0.1, rotateX: 70, opacity: 0, filter: "blur(40px)" },
-                { y: -80, scale: 1.25, rotateX: -18, opacity: 1, filter: "blur(0px)", duration: 0.52, ease: "power4.in" }
-            )
-            .addLabel("slam-moment")
-            .add(() => {
-                triggerShake((finalRarity === 'hard' || finalRarity === 'epic') ? 'heavy' : 'medium');
-                if (finalRarity === 'epic') {
-                    triggerImpactFrame();
-                    setTimeout(triggerImpactFrame, 60);
-                }
-                summonFx.stop();
-                clearSummonScene();
-            }, "slam-moment")
-            .to(cardStage, {
-                y: 0, scale: 1, rotateX: 0, duration: 0.75, ease: "elastic.out(1, 0.42)"
-            }, "slam-moment");
-
-        mainTl.to(whiteFlash, { opacity: 0, duration: 0.9 }, "slam-moment+=0.1")
-            .add(() => {
-                cardStage.classList.remove('materializing');
-                cardStage.classList.add('presented');
-                resetGyroBaseline();
-                logTiltDebug('reveal/presented', {}, { force: true });
-            })
-            .add(() => revealFx.start(initialFxRarity, cardStage.getBoundingClientRect()))
-            .to({}, {
-                duration: 0.5,
-                onComplete: () => {
-                    cardRevealOverlay.classList.remove('impacting');
-                    logTiltDebug('reveal/impacting-removed', {}, { force: true });
-                }
-            })
-            .addLabel("flip-start", "+=0.3")
-            .add(() => {
-                theCard.classList.add('is-flipped');
-                logTiltDebug('flip/start', {}, { force: true });
-            }, "flip-start")
-            .to(cardInnerWrap, {
-                rotationY: 180,
-                duration: 1.05,
-                ease: "back.out(1.15)",
-                overwrite: "auto"
-            }, "flip-start")
-            .to(theCard, {
-                z: 130,
-                scale: 1.05,
-                duration: 0.85,
-                ease: "back.out(1.2)"
-            }, "flip-start")
-            .to(cardGlare, { x: "100%", duration: 1.2, ease: "power2.inOut" }, "flip-start+=0.1")
-            .to(theCard, {
-                z: 0, scale: 1, duration: 0.5, ease: "elastic.out(1, 0.6)"
-            }, "-=0.2")
-            .add(() => retryBtn.classList.add('active'), "+=0.1")
-            .to(retryBtn, { autoAlpha: 1, y: 0, duration: 0.5, ease: "power2.out" }, "-=0.2");
-
         await mainTl;
     } catch (error) {
         console.error('终极出卡失败:', error);
