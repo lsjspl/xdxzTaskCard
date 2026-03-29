@@ -41,6 +41,43 @@ body {
     linear-gradient(180deg, #fff7de 0%, #fdf2d0 52%, #f8e7c3 100%);
 }
 
+body.game-engine-mode {
+  overscroll-behavior: none;
+}
+
+body.fx-lite .noise-layer {
+  opacity: 0.025;
+}
+
+body.fx-lite .deco-element {
+  animation-duration: 10s;
+  text-shadow: 0 0 14px rgba(229, 133, 181, 0.12);
+}
+
+body.fx-lite .card-char-pop {
+  filter:
+    drop-shadow(0 12px 20px rgba(28, 18, 18, 0.18))
+    drop-shadow(0 0 10px rgba(255, 255, 255, 0.24));
+}
+
+body.fx-lite .card-holographic-foil {
+  filter: blur(2px);
+}
+
+body.fx-lite #summon-fx-canvas,
+body.fx-lite #confetti-canvas {
+  mix-blend-mode: screen;
+}
+
+body.fx-lite .impact-radial-beams,
+body.fx-lite .reveal-beams-bg {
+  animation-duration: 12s;
+}
+
+body.fx-lite .retry-btn {
+  backdrop-filter: none;
+}
+
 #main-bg-canvas,
 #summon-fx-canvas,
 #confetti-canvas {
@@ -171,6 +208,10 @@ body {
 #main-bg-canvas {
   z-index: 1;
   opacity: 0.82;
+}
+
+body.fx-mobile #main-bg-canvas {
+  opacity: 0.72;
 }
 
 .noise-layer {
@@ -876,6 +917,12 @@ body {
   mix-blend-mode: multiply;
 }
 
+body.fx-lite #summon-overlay::before,
+body.fx-lite .summon-backdrop::after,
+body.fx-lite .impact-halo {
+  filter: blur(6px);
+}
+
 #white-flash {
   z-index: 6;
   opacity: 0;
@@ -1244,6 +1291,15 @@ body {
   z-index: 2;
   mix-blend-mode: multiply;
   pointer-events: none;
+}
+
+body.fx-lite #card-stage,
+body.fx-lite #the-card,
+body.fx-lite .card-inner-wrap,
+body.fx-lite .card-face,
+body.fx-lite .card-bg-image,
+body.fx-lite .card-char-pop {
+  will-change: auto;
 }
 
 #card-stage {
@@ -1685,5 +1741,10 @@ body {
     top: calc(50% + (var(--card-height) / 2) + 28px);
     height: 56px;
     font-size: 1.2rem;
+  }
+
+  body.fx-lite .reveal-runway,
+  body.fx-lite .summon-grid {
+    opacity: 0.24;
   }
 }

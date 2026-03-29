@@ -21,6 +21,10 @@ const retryBtn = document.getElementById('retry-btn');
 
 const mainBgCanvas = document.getElementById('main-bg-canvas');
 const confettiCanvas = document.getElementById('confetti-canvas');
+const homeHeroBg = document.getElementById('home-hero-bg');
+const homeHeroChar = document.getElementById('home-hero-char');
+const cardCharPop = document.getElementById('card-char-pop');
+const cardHolographicFoil = document.getElementById('card-holographic-foil');
 
 const RARITY_THEME = {
     easy: {
@@ -94,12 +98,63 @@ const randomRange = (min, max) => Math.random() * (max - min) + min;
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const lerp = (start, end, amount) => start + (end - start) * amount;
 
+function buildPerformanceProfile() {
+    if (typeof window === 'undefined') {
+        return {
+            isMobileViewport: false,
+            reducedMotion: false,
+            lowMemory: false,
+            lowCpu: false,
+            coarsePointer: false,
+            liteFx: false,
+            fxDensity: 1,
+            backgroundFps: 45,
+            summonFps: 60,
+            revealFps: 60
+        };
+    }
+
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    const isMobileViewport = window.innerWidth <= 768;
+    const lowMemory = typeof navigator !== 'undefined' && Number.isFinite(navigator.deviceMemory) && navigator.deviceMemory <= 4;
+    const lowCpu = typeof navigator !== 'undefined' && Number.isFinite(navigator.hardwareConcurrency) && navigator.hardwareConcurrency <= 4;
+    const coarsePointer = window.matchMedia?.('(pointer: coarse)').matches ?? (navigator.maxTouchPoints > 0);
+    const liteFx = Boolean(reducedMotion || lowMemory || lowCpu || (isMobileViewport && coarsePointer));
+    const fxDensity = reducedMotion ? 0.28 : liteFx ? 0.52 : isMobileViewport ? 0.76 : 1;
+
+    return {
+        isMobileViewport,
+        reducedMotion,
+        lowMemory,
+        lowCpu,
+        coarsePointer,
+        liteFx,
+        fxDensity,
+        backgroundFps: reducedMotion ? 18 : liteFx ? 24 : isMobileViewport ? 30 : 45,
+        summonFps: reducedMotion ? 20 : liteFx ? 30 : 60,
+        revealFps: reducedMotion ? 20 : liteFx ? 30 : 60
+    };
+}
+
+const PERFORMANCE_PROFILE = buildPerformanceProfile();
+
+function syncPerformanceProfile() {
+    const nextProfile = buildPerformanceProfile();
+    Object.assign(PERFORMANCE_PROFILE, nextProfile);
+
+    if (document?.body) {
+        document.body.classList.toggle('game-engine-mode', true);
+        document.body.classList.toggle('fx-lite', PERFORMANCE_PROFILE.liteFx);
+        document.body.classList.toggle('fx-mobile', PERFORMANCE_PROFILE.isMobileViewport);
+    }
+}
+
+function scaleCount(base, minimum = 1) {
+    return Math.max(minimum, Math.round(base * PERFORMANCE_PROFILE.fxDensity));
+}
+
 function shouldUseLiteFx() {
-    if (typeof window === 'undefined') return false;
-    const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    const lowMemoryDevice = typeof navigator !== 'undefined' && Number.isFinite(navigator.deviceMemory) && navigator.deviceMemory <= 4;
-    const lowCpuDevice = typeof navigator !== 'undefined' && Number.isFinite(navigator.hardwareConcurrency) && navigator.hardwareConcurrency <= 4;
-    return Boolean(prefersReducedMotion || lowMemoryDevice || lowCpuDevice);
+    return PERFORMANCE_PROFILE.liteFx;
 }
 
 let lastTiltDebugAt = 0;
@@ -230,8 +285,6 @@ function getFxRarity() {
 function applyDestinySkin(destiny, initialFxRarity) {
     const theme = RARITY_THEME[destiny.rarity];
     const fxRarity = initialFxRarity || destiny.rarity;
-    const charPop = document.getElementById('card-char-pop');
-    const foil = document.getElementById('card-holographic-foil');
 
     summonOverlay.dataset.rarity = fxRarity;
     cardRevealOverlay.dataset.rarity = fxRarity; // Start with initial, then upgrade if fakeout
@@ -247,22 +300,236 @@ function applyDestinySkin(destiny, initialFxRarity) {
     cardBgImage.style.backgroundImage = `url("${bgUrl}")`;
     cardBgImage.style.backgroundColor = 'rgba(255, 248, 238, 0.92)';
 
-    if (charPop) {
+    if (cardCharPop) {
         const charUrl = destiny.task.char || theme.char;
-        charPop.style.backgroundImage = `url('${charUrl}')`;
-        charPop.style.opacity = '1';
+        cardCharPop.style.backgroundImage = `url('${charUrl}')`;
+        cardCharPop.style.opacity = '1';
     }
 
     // Reset foil position
-    if (foil) {
-        foil.style.backgroundPosition = '0% 0%';
+    if (cardHolographicFoil) {
+        cardHolographicFoil.style.backgroundPosition = '0% 0%';
     }
 }
 
-function resetCardTilt() {
-    const foil = document.getElementById('card-holographic-foil');
-    const charPop = document.getElementById('card-char-pop');
+class InteractionEngine {
+    constructor() {
+        this.card = {
+            current: { rotationX: 0, rotationY: 0, z: 0, scale: 1, bgX: 0, bgY: 0, bgScale: 1.04, glareX: 0, glareY: 0, glareRotate: 0, foilPosX: 50, foilPosY: 50, foilX: 0, foilY: 0, charX: 0, charY: 8, charZ: 112, charRotateX: 0, charRotateY: 0, charRotateZ: 0, charScale: 1.08 },
+            target: { rotationX: 0, rotationY: 0, z: 0, scale: 1, bgX: 0, bgY: 0, bgScale: 1.04, glareX: 0, glareY: 0, glareRotate: 0, foilPosX: 50, foilPosY: 50, foilX: 0, foilY: 0, charX: 0, charY: 8, charZ: 112, charRotateX: 0, charRotateY: 0, charRotateZ: 0, charScale: 1.08 }
+        };
+        this.home = {
+            current: { charX: 0, charY: 0, charRotationY: 0, charRotationX: 0, bgX: 0, bgY: 0, bgRotationY: 0, bgRotationX: 0 },
+            target: { charX: 0, charY: 0, charRotationY: 0, charRotationX: 0, bgX: 0, bgY: 0, bgRotationY: 0, bgRotationX: 0 }
+        };
+        this.rafId = 0;
+        this.cardDirty = true;
+        this.homeDirty = true;
+        this.tick = this.tick.bind(this);
+        this.ensureRunning();
+    }
 
+    ensureRunning() {
+        if (this.rafId) return;
+        this.rafId = requestAnimationFrame(this.tick);
+    }
+
+    updateState(current, target, damping) {
+        let moving = false;
+        Object.keys(target).forEach(key => {
+            const nextValue = lerp(current[key], target[key], damping);
+            if (Math.abs(target[key] - nextValue) > 0.001) moving = true;
+            current[key] = Math.abs(target[key] - nextValue) < 0.001 ? target[key] : nextValue;
+        });
+        return moving;
+    }
+
+    setCardTarget(dx, dy) {
+        const safeDx = clamp(dx, -1, 1);
+        const safeDy = clamp(dy, -1, 1);
+        Object.assign(this.card.target, {
+            rotationX: -safeDy * 15,
+            rotationY: safeDx * 15,
+            z: 20,
+            scale: 1.01,
+            bgX: -safeDx * 25,
+            bgY: -safeDy * 15,
+            bgScale: 1.08,
+            glareX: safeDx * 26,
+            glareY: safeDy * 26,
+            glareRotate: safeDx * 5,
+            foilPosX: 50 + safeDx * 25,
+            foilPosY: 50 + safeDy * 25,
+            foilX: safeDx * 4,
+            foilY: safeDy * 3,
+            charX: safeDx * 28,
+            charY: 8 + safeDy * 12,
+            charZ: 126,
+            charRotateX: -safeDy * 3.5,
+            charRotateY: safeDx * 5,
+            charRotateZ: safeDx * 1.2,
+            charScale: 1.08 + Math.abs(safeDx) * 0.015
+        });
+        this.cardDirty = true;
+        this.ensureRunning();
+    }
+
+    resetCard() {
+        Object.assign(this.card.target, {
+            rotationX: 0,
+            rotationY: 0,
+            z: 0,
+            scale: 1,
+            bgX: 0,
+            bgY: 0,
+            bgScale: 1.04,
+            glareX: 0,
+            glareY: 0,
+            glareRotate: 0,
+            foilPosX: 50,
+            foilPosY: 50,
+            foilX: 0,
+            foilY: 0,
+            charX: 0,
+            charY: 8,
+            charZ: 112,
+            charRotateX: 0,
+            charRotateY: 0,
+            charRotateZ: 0,
+            charScale: 1.08
+        });
+        this.cardDirty = true;
+        this.ensureRunning();
+    }
+
+    setHomeTarget(dx, dy) {
+        const safeDx = clamp(dx, -1, 1);
+        const safeDy = clamp(dy, -1, 1);
+        Object.assign(this.home.target, {
+            charX: safeDx * 30,
+            charY: safeDy * 15,
+            charRotationY: safeDx * 5,
+            charRotationX: -safeDy * 2,
+            bgX: safeDx * -20,
+            bgY: safeDy * -10,
+            bgRotationY: safeDx * -2,
+            bgRotationX: safeDy * 1
+        });
+        this.homeDirty = true;
+        this.ensureRunning();
+    }
+
+    resetHome() {
+        Object.assign(this.home.target, {
+            charX: 0,
+            charY: 0,
+            charRotationY: 0,
+            charRotationX: 0,
+            bgX: 0,
+            bgY: 0,
+            bgRotationY: 0,
+            bgRotationX: 0
+        });
+        this.homeDirty = true;
+        this.ensureRunning();
+    }
+
+    renderCard() {
+        const state = this.card.current;
+        gsap.set(theCard, {
+            rotationX: state.rotationX,
+            rotationY: state.rotationY,
+            z: state.z,
+            scale: state.scale,
+            transformPerspective: 1200
+        });
+        gsap.set(cardBgImage, {
+            x: state.bgX,
+            y: state.bgY,
+            z: 0,
+            scale: state.bgScale
+        });
+        gsap.set(cardGlare, {
+            x: state.glareX,
+            y: state.glareY,
+            rotate: state.glareRotate
+        });
+        if (cardHolographicFoil) {
+            gsap.set(cardHolographicFoil, {
+                backgroundPosition: `${state.foilPosX}% ${state.foilPosY}%`,
+                x: state.foilX,
+                y: state.foilY
+            });
+        }
+        if (cardCharPop) {
+            gsap.set(cardCharPop, {
+                xPercent: -50,
+                x: state.charX,
+                y: state.charY,
+                z: state.charZ,
+                rotationX: state.charRotateX,
+                rotationY: state.charRotateY,
+                rotationZ: state.charRotateZ,
+                scale: state.charScale
+            });
+        }
+        if (taskContentWrap) {
+            gsap.set(taskContentWrap, {
+                x: 0,
+                y: 0,
+                z: 0,
+                rotationX: 0,
+                rotationY: 0
+            });
+        }
+    }
+
+    renderHome() {
+        const state = this.home.current;
+        if (homeHeroChar) {
+            gsap.set(homeHeroChar, {
+                xPercent: -50,
+                x: state.charX,
+                y: state.charY,
+                rotationY: state.charRotationY,
+                rotationX: state.charRotationX
+            });
+        }
+        if (homeHeroBg) {
+            gsap.set(homeHeroBg, {
+                x: state.bgX,
+                y: state.bgY,
+                rotationY: state.bgRotationY,
+                rotationX: state.bgRotationX
+            });
+        }
+    }
+
+    tick() {
+        this.rafId = 0;
+        const cardMoving = this.updateState(this.card.current, this.card.target, PERFORMANCE_PROFILE.liteFx ? 0.2 : 0.16);
+        const homeMoving = this.updateState(this.home.current, this.home.target, PERFORMANCE_PROFILE.liteFx ? 0.16 : 0.12);
+        const shouldRenderCard = this.cardDirty || cardMoving;
+        const shouldRenderHome = this.homeDirty || homeMoving;
+
+        if (shouldRenderCard) {
+            this.renderCard();
+            this.cardDirty = false;
+        }
+        if (shouldRenderHome) {
+            this.renderHome();
+            this.homeDirty = false;
+        }
+
+        if (cardMoving || homeMoving) {
+            this.ensureRunning();
+        }
+    }
+}
+
+const interactionEngine = new InteractionEngine();
+
+function resetCardTilt() {
     resetGyroBaseline();
     pendingTiltPoint = null;
     if (tiltRafId) {
@@ -270,72 +537,7 @@ function resetCardTilt() {
         tiltRafId = 0;
     }
     logTiltDebug('reset/request', { activeTiltPointerId }, { force: true });
-
-    gsap.to(theCard, {
-        rotationX: 0,
-        rotationY: 0,
-        z: 0,
-        scale: 1,
-        duration: 0.8,
-        ease: "power2.out",
-        overwrite: "auto"
-    });
-
-    gsap.to(cardBgImage, { 
-        x: 0, 
-        y: 0, 
-        z: 0,
-        scale: 1.04, 
-        duration: 0.6, 
-        ease: "power2.out",
-        overwrite: "auto"
-    });
-
-    gsap.to(cardGlare, {
-        x: 0,
-        y: 0,
-        rotate: 0,
-        duration: 0.6,
-        ease: "power2.out",
-        overwrite: "auto"
-    });
-
-    if (foil) {
-        gsap.to(foil, {
-            backgroundPosition: "50% 50%",
-            duration: 0.6,
-            ease: "power2.out",
-            overwrite: "auto"
-        });
-    }
-
-    if (charPop) {
-        gsap.to(charPop, {
-            xPercent: -50,
-            y: 8,
-            z: 112,
-            rotateX: 0,
-            rotateY: 0,
-            rotateZ: 0,
-            scale: 1.08,
-            duration: 0.6,
-            ease: "power2.out",
-            overwrite: "auto"
-        });
-    }
-
-    if (taskContentWrap) {
-        gsap.to(taskContentWrap, {
-            x: 0,
-            y: 0,
-            z: 0,
-            rotationX: 0,
-            rotationY: 0,
-            duration: 0.55,
-            ease: "power2.out",
-            overwrite: "auto"
-        });
-    }
+    interactionEngine.resetCard();
 
     requestAnimationFrame(() => {
         logTiltDebug('reset/applied', {}, { force: true });
@@ -348,7 +550,7 @@ function clearTiltBoundsCache() {
 }
 
 function canTiltCard() {
-    return cardRevealOverlay.classList.contains('active');
+    return cardRevealOverlay.classList.contains('active') && cardStage.classList.contains('presented');
 }
 
 function resetGyroBaseline() {
@@ -377,78 +579,7 @@ function applyCardTilt(dx, dy, source = 'pointer', payload = {}) {
     const safeDy = clamp(dy, -1, 1);
     const targetRotationX = -safeDy * 15;
     const targetRotationY = safeDx * 15;
-    const foil = document.getElementById('card-holographic-foil');
-    const charPop = document.getElementById('card-char-pop');
-
-    gsap.to(theCard, {
-        rotationX: targetRotationX,
-        rotationY: targetRotationY,
-        z: 20,
-        scale: 1.01,
-        transformPerspective: 1200,
-        duration: 0.4,
-        ease: "power1.out",
-        overwrite: "auto"
-    });
-
-    gsap.to(cardBgImage, {
-        x: -safeDx * 25,
-        y: -safeDy * 15,
-        z: 0,
-        scale: 1.08,
-        duration: 0.5,
-        ease: "power1.out",
-        overwrite: "auto"
-    });
-
-    gsap.to(cardGlare, {
-        x: safeDx * 26,
-        y: safeDy * 26,
-        rotation: safeDx * 5,
-        duration: 0.5,
-        ease: "power1.out",
-        overwrite: "auto"
-    });
-
-    if (foil) {
-        gsap.to(foil, {
-            backgroundPosition: `${50 + safeDx * 25}% ${50 + safeDy * 25}%`,
-            x: safeDx * 4,
-            y: safeDy * 3,
-            duration: 0.5,
-            ease: "power1.out",
-            overwrite: "auto"
-        });
-    }
-
-    if (charPop) {
-        gsap.to(charPop, {
-            xPercent: -50,
-            x: safeDx * 28,
-            y: 8 + safeDy * 12,
-            z: 126,
-            rotationX: -safeDy * 3.5,
-            rotationY: safeDx * 5,
-            rotationZ: safeDx * 1.2,
-            scale: 1.08 + Math.abs(safeDx) * 0.015,
-            duration: 0.6,
-            ease: "power2.out",
-            overwrite: "auto"
-        });
-    }
-
-    if (taskContentWrap) {
-        gsap.to(taskContentWrap, {
-            x: 0,
-            y: 0,
-            z: 0,
-            rotationX: 0,
-            rotationY: 0,
-            duration: 0.55,
-            ease: "power2.out",
-            overwrite: "auto"
-        });
-    }
+    interactionEngine.setCardTarget(safeDx, safeDy);
 
     requestAnimationFrame(() => {
         logTiltDebug('update/applied', {
@@ -515,30 +646,8 @@ function updateHomeTilt(clientX, clientY) {
 }
 
 function applyHomeTilt(dx, dy) {
-    const homeChar = document.getElementById('home-hero-char');
-    const homeBg = document.getElementById('home-hero-bg');
-    if (!homeChar || !homeBg) return;
-
-    gsap.to(homeChar, {
-        xPercent: -50,
-        x: dx * 30,
-        y: dy * 15,
-        rotationY: dx * 5,
-        rotationX: -dy * 2,
-        duration: 0.8,
-        ease: "power2.out",
-        overwrite: "auto"
-    });
-
-    gsap.to(homeBg, {
-        x: dx * -20,
-        y: dy * -10,
-        rotationY: dx * -2,
-        rotationX: dy * 1,
-        duration: 1.2,
-        ease: "power2.out",
-        overwrite: "auto"
-    });
+    if (!homeHeroChar || !homeHeroBg) return;
+    interactionEngine.setHomeTarget(dx, dy);
 }
 
 function queueCardTiltUpdate(clientX, clientY) {
@@ -741,6 +850,8 @@ class BackgroundEngine {
         this.ctx = canvas.getContext('2d');
         this.orbs = [];
         this.lines = [];
+        this.rafId = 0;
+        this.lastFrameAt = 0;
         this.resize();
         this.seed();
         window.addEventListener('resize', () => {
@@ -753,12 +864,13 @@ class BackgroundEngine {
         setCanvasSize(this.canvas, this.ctx);
         this.width = window.innerWidth;
         this.height = window.innerHeight;
-        this.isMobileViewport = this.width <= 768;
-        this.fxVisibilityBoost = this.isMobileViewport ? 1.28 : 1;
+        this.isMobileViewport = PERFORMANCE_PROFILE.isMobileViewport;
+        this.fxVisibilityBoost = this.isMobileViewport ? 1.2 : 1;
+        this.frameDuration = 1000 / PERFORMANCE_PROFILE.backgroundFps;
     }
 
     seed() {
-        this.orbs = Array.from({ length: 18 }, () => ({
+        this.orbs = Array.from({ length: scaleCount(18, 8) }, () => ({
             x: Math.random() * this.width,
             y: Math.random() * this.height,
             radius: randomRange(60, 180),
@@ -767,7 +879,7 @@ class BackgroundEngine {
             driftY: randomRange(-0.1, 0.04)
         }));
 
-        this.lines = Array.from({ length: 18 }, () => ({
+        this.lines = Array.from({ length: scaleCount(18, 8) }, () => ({
             x: Math.random() * this.width,
             y: Math.random() * this.height,
             length: randomRange(120, 360),
@@ -776,11 +888,18 @@ class BackgroundEngine {
         }));
     }
 
-    draw = () => {
+    draw = (now = 0) => {
+        if (this.lastFrameAt && now - this.lastFrameAt < this.frameDuration) {
+            this.rafId = requestAnimationFrame(this.draw);
+            return;
+        }
+        const elapsed = this.lastFrameAt ? now - this.lastFrameAt : this.frameDuration;
+        const step = elapsed / 16.67;
+        this.lastFrameAt = now;
         this.ctx.clearRect(0, 0, this.width, this.height);
         this.orbs.forEach(orb => {
-            orb.x += orb.driftX;
-            orb.y += orb.driftY;
+            orb.x += orb.driftX * step;
+            orb.y += orb.driftY * step;
             if (orb.x < -orb.radius) orb.x = this.width + orb.radius;
             if (orb.x > this.width + orb.radius) orb.x = -orb.radius;
             if (orb.y < -orb.radius) orb.y = this.height + orb.radius;
@@ -795,7 +914,7 @@ class BackgroundEngine {
         });
 
         this.lines.forEach(line => {
-            line.y += line.speed;
+            line.y += line.speed * step;
             if (line.y - line.length > this.height) {
                 line.y = -line.length;
                 line.x = Math.random() * this.width;
@@ -810,7 +929,7 @@ class BackgroundEngine {
             this.ctx.lineTo(line.x, line.y);
             this.ctx.stroke();
         });
-        requestAnimationFrame(this.draw);
+        this.rafId = requestAnimationFrame(this.draw);
     };
 }
 
@@ -829,6 +948,7 @@ class SummonFxEngine {
         this.waves = [];
         this.bridgeTarget = null;
         this.rafId = 0;
+        this.lastFrameAt = 0;
         this.resize();
         window.addEventListener('resize', () => this.resize());
     }
@@ -837,9 +957,10 @@ class SummonFxEngine {
         setCanvasSize(this.canvas, this.ctx);
         this.width = window.innerWidth;
         this.height = window.innerHeight;
-        this.isMobileViewport = this.width <= 768;
+        this.isMobileViewport = PERFORMANCE_PROFILE.isMobileViewport;
         this.liteFx = shouldUseLiteFx();
         this.fxVisibilityBoost = this.isMobileViewport ? 1.28 : 1;
+        this.frameDuration = 1000 / PERFORMANCE_PROFILE.summonFps;
     }
 
     start(rarity) {
@@ -854,12 +975,14 @@ class SummonFxEngine {
         this.burst = [];
         this.waves = [];
         this.bridgeTarget = null;
+        this.lastFrameAt = 0;
         this.animate();
     }
 
     stop() {
         this.active = false;
         cancelAnimationFrame(this.rafId);
+        this.lastFrameAt = 0;
         this.ctx.clearRect(0, 0, this.width, this.height);
         summonOverlay.style.removeProperty('--gate-open');
     }
@@ -873,16 +996,16 @@ class SummonFxEngine {
         this.phase = phase;
         this.phaseTime = 0;
         if (phase === 'charge') {
-            this.seedInward(this.liteFx ? 28 : 40);
+            this.seedInward(scaleCount(this.liteFx ? 28 : 40, 16));
         } else if (phase === 'compress') {
-            this.seedInward(this.liteFx ? 64 : 90);
+            this.seedInward(scaleCount(this.liteFx ? 64 : 90, 28));
             this.spawnWave(70, 0.2, 2.2);
         } else if (phase === 'tear') {
             const isEpic = this.palette === RARITY_THEME.epic.fx;
             const isHard = this.palette === RARITY_THEME.hard.fx;
             const streakCount = (isHard || isEpic)
-                ? (this.liteFx ? 220 : 380)
-                : (this.liteFx ? 120 : 180);
+                ? scaleCount(this.liteFx ? 220 : 380, 92)
+                : scaleCount(this.liteFx ? 120 : 180, 64);
             for (let i = 0; i < streakCount; i += 1) this.spawnBurstStreak();
             this.spawnWave(54, 0.75, 5.2);
             this.spawnWave(84, 0.56, 4.3);
@@ -911,7 +1034,7 @@ class SummonFxEngine {
     seedAmbient() {
         const centerX = this.width / 2;
         const centerY = this.height / 2;
-        const ambientCount = this.liteFx ? 58 : 96;
+        const ambientCount = scaleCount(this.liteFx ? 58 : 96, 24);
         this.ambient = Array.from({ length: ambientCount }, () => {
             const angle = Math.random() * Math.PI * 2;
             const radius = randomRange(80, Math.min(this.width, this.height) * 0.42);
@@ -998,11 +1121,18 @@ class SummonFxEngine {
         });
     }
 
-    animate = () => {
+    animate = (now = 0) => {
         if (!this.active) return;
+        if (this.lastFrameAt && now - this.lastFrameAt < this.frameDuration) {
+            this.rafId = requestAnimationFrame(this.animate);
+            return;
+        }
         const centerX = this.width / 2;
         const centerY = this.height / 2;
-        this.phaseTime += 1;
+        const elapsed = this.lastFrameAt ? now - this.lastFrameAt : this.frameDuration;
+        const step = elapsed / 16.67;
+        this.lastFrameAt = now;
+        this.phaseTime += step;
         this.ctx.clearRect(0, 0, this.width, this.height);
         this.ctx.save();
         this.ctx.globalCompositeOperation = 'multiply';
@@ -1062,24 +1192,24 @@ class SummonFxEngine {
             this.ctx.fill();
         });
 
-        if ((this.phase === 'charge' || this.phase === 'compress') && this.phaseTime % (this.phase === 'compress' ? 1 : 2) === 0) {
+        if ((this.phase === 'charge' || this.phase === 'compress') && Math.floor(this.phaseTime) % (this.phase === 'compress' ? 1 : 2) === 0) {
             const count = this.phase === 'compress'
-                ? (this.liteFx ? 4 : 7)
-                : (this.liteFx ? 2 : 4);
+                ? scaleCount(this.liteFx ? 4 : 7, 2)
+                : scaleCount(this.liteFx ? 2 : 4, 1);
             for (let i = 0; i < count; i += 1) this.spawnInwardShard();
         }
         if (this.phase === 'tear' && this.phaseTime < 20) {
-            const burstCount = this.liteFx ? 10 : 18;
+            const burstCount = scaleCount(this.liteFx ? 10 : 18, 6);
             for (let i = 0; i < burstCount; i += 1) this.spawnBurstStreak();
         }
 
         this.inward = this.inward.filter(shard => {
             shard.px = shard.x;
             shard.py = shard.y;
-            shard.age += 1;
+            shard.age += step;
             const speedBoost = this.phase === 'compress' ? 1.5 : 1;
-            shard.x += shard.vx * shard.speed * speedBoost;
-            shard.y += shard.vy * shard.speed * speedBoost;
+            shard.x += shard.vx * shard.speed * speedBoost * step;
+            shard.y += shard.vy * shard.speed * speedBoost * step;
             const dx = shard.tx - shard.x;
             const dy = shard.ty - shard.y;
             const dist = Math.hypot(dx, dy);
@@ -1098,11 +1228,11 @@ class SummonFxEngine {
         });
 
         this.burst = this.burst.filter(streak => {
-            streak.age += 1;
-            streak.x += streak.vx;
-            streak.y += streak.vy;
-            streak.vx *= 0.94;
-            streak.vy *= 0.94;
+            streak.age += step;
+            streak.x += streak.vx * step;
+            streak.y += streak.vy * step;
+            streak.vx *= Math.pow(0.94, step);
+            streak.vy *= Math.pow(0.94, step);
             const lifeProgress = streak.age / streak.life;
             const alpha = streak.alpha * (1 - lifeProgress);
             const tailX = streak.x - streak.vx * 0.9;
@@ -1122,8 +1252,8 @@ class SummonFxEngine {
         });
 
         this.waves = this.waves.filter(wave => {
-            wave.radius += wave.speed;
-            wave.alpha *= 0.95;
+            wave.radius += wave.speed * step;
+            wave.alpha *= Math.pow(0.95, step);
             this.ctx.strokeStyle = `rgba(${wave.color},${wave.alpha})`;
             this.ctx.lineWidth = wave.width;
             this.ctx.save();
@@ -1173,6 +1303,7 @@ class RevealFxEngine {
         this.rings = [];
         this.rafId = 0;
         this.time = 0;
+        this.lastFrameAt = 0;
         this.resize();
         window.addEventListener('resize', () => this.resize());
     }
@@ -1181,6 +1312,7 @@ class RevealFxEngine {
         setCanvasSize(this.canvas, this.ctx);
         this.width = window.innerWidth;
         this.height = window.innerHeight;
+        this.frameDuration = 1000 / PERFORMANCE_PROFILE.revealFps;
     }
 
     start(rarity, rect) {
@@ -1191,7 +1323,7 @@ class RevealFxEngine {
             x: rect.left + rect.width / 2,
             y: rect.top + rect.height * 0.46
         };
-        this.sparkles = Array.from({ length: 28 }, () => ({
+        this.sparkles = Array.from({ length: scaleCount(28, 12) }, () => ({
             angle: Math.random() * Math.PI * 2,
             radius: randomRange(rect.width * 0.18, rect.width * 0.7),
             size: randomRange(1.4, 3.8),
@@ -1206,12 +1338,14 @@ class RevealFxEngine {
             { radius: rect.width * 0.42, alpha: 0.24, width: 1.8, speed: 2.8, color: this.palette[1] }
         ];
         this.time = 0;
+        this.lastFrameAt = 0;
         this.animate();
     }
 
     stop() {
         this.active = false;
         cancelAnimationFrame(this.rafId);
+        this.lastFrameAt = 0;
         this.ctx.clearRect(0, 0, this.width, this.height);
     }
 
@@ -1245,15 +1379,22 @@ class RevealFxEngine {
         });
     }
 
-    animate = () => {
+    animate = (now = 0) => {
         if (!this.active) return;
-        this.time += 1;
+        if (this.lastFrameAt && now - this.lastFrameAt < this.frameDuration) {
+            this.rafId = requestAnimationFrame(this.animate);
+            return;
+        }
+        const elapsed = this.lastFrameAt ? now - this.lastFrameAt : this.frameDuration;
+        const step = elapsed / 16.67;
+        this.lastFrameAt = now;
+        this.time += step;
         this.ctx.clearRect(0, 0, this.width, this.height);
         this.ctx.save();
         this.ctx.globalCompositeOperation = 'multiply';
         this.rings = this.rings.filter(ring => {
-            ring.radius += ring.speed;
-            ring.alpha *= 0.97;
+            ring.radius += ring.speed * step;
+            ring.alpha *= Math.pow(0.97, step);
             this.ctx.strokeStyle = `rgba(${ring.color},${ring.alpha})`;
             this.ctx.lineWidth = ring.width;
             this.ctx.save();
@@ -1268,7 +1409,7 @@ class RevealFxEngine {
         });
 
         this.sparkles.forEach(sparkle => {
-            sparkle.angle += sparkle.speed;
+            sparkle.angle += sparkle.speed * step;
             const x = this.anchor.x + Math.cos(sparkle.angle) * sparkle.radius;
             const y = this.anchor.y + Math.sin(sparkle.angle) * sparkle.radius * 0.72;
             const alpha = sparkle.alpha * (0.6 + Math.sin(this.time * 0.06 + sparkle.angle) * 0.4);
@@ -1280,19 +1421,19 @@ class RevealFxEngine {
             this.ctx.fill();
         });
 
-        if ((this.time < 52 && this.time % 1 === 0) || (this.time < 132 && this.time % 3 === 0)) {
-            const burstCount = this.time < 20 ? 8 : 4;
+        if ((this.time < 52 && Math.floor(this.time) % 1 === 0) || (this.time < 132 && Math.floor(this.time) % 3 === 0)) {
+            const burstCount = scaleCount(this.time < 20 ? 8 : 4, 2);
             for (let i = 0; i < burstCount; i += 1) this.spawnTrail();
         }
-        if ((this.time < 160 && this.time % 2 === 0) || (this.time < 320 && this.time % 6 === 0)) {
+        if ((this.time < 160 && Math.floor(this.time) % 2 === 0) || (this.time < 320 && Math.floor(this.time) % 6 === 0)) {
             this.spawnEmber();
         }
         this.trails = this.trails.filter(trail => {
-            trail.age += 1;
-            trail.x += trail.vx;
-            trail.y += trail.vy;
-            trail.vx *= 0.94;
-            trail.vy *= 0.94;
+            trail.age += step;
+            trail.x += trail.vx * step;
+            trail.y += trail.vy * step;
+            trail.vx *= Math.pow(0.94, step);
+            trail.vy *= Math.pow(0.94, step);
             const lifeProgress = trail.age / trail.life;
             const alpha = trail.alpha * (1 - lifeProgress);
             const tailX = trail.x - trail.vx;
@@ -1310,10 +1451,10 @@ class RevealFxEngine {
         });
 
         this.embers = this.embers.filter(ember => {
-            ember.age += 1;
-            ember.x += ember.vx;
-            ember.y += ember.vy;
-            ember.vy += 0.02;
+            ember.age += step;
+            ember.x += ember.vx * step;
+            ember.y += ember.vy * step;
+            ember.vy += 0.02 * step;
             const lifeProgress = ember.age / ember.life;
             const alpha = ember.alpha * (1 - lifeProgress);
             this.ctx.fillStyle = `rgba(${ember.color},${alpha})`;
@@ -1333,6 +1474,7 @@ const mainBg = new BackgroundEngine(mainBgCanvas);
 const summonFx = new SummonFxEngine(summonFxCanvas);
 const revealFx = new RevealFxEngine(confettiCanvas);
 
+syncPerformanceProfile();
 mainBg.draw();
 
 // --- Enhanced Event Listeners for 3D Parallax ---
@@ -1382,19 +1524,31 @@ const endPointerInteraction = (event) => {
         resetGyroBaseline();
         resetCardTilt();
     }
+    if (event.pointerType !== 'mouse' && canTiltHome()) {
+        interactionEngine.resetHome();
+    }
 };
 
 window.addEventListener('pointerup', endPointerInteraction);
 window.addEventListener('pointercancel', endPointerInteraction);
 window.addEventListener('orientationchange', resetGyroBaseline);
-window.addEventListener('resize', clearTiltBoundsCache);
+window.addEventListener('resize', () => {
+    syncPerformanceProfile();
+    clearTiltBoundsCache();
+});
 window.addEventListener('scroll', clearTiltBoundsCache, { passive: true });
 
 // Reset tilt when mouse leaves the viewport entirely
-document.addEventListener('mouseleave', resetCardTilt);
+document.addEventListener('mouseleave', () => {
+    interactionEngine.resetHome();
+    resetCardTilt();
+});
 cardRevealOverlay.addEventListener('mouseleave', resetCardTilt);
 
-window.addEventListener('blur', resetCardTilt);
+window.addEventListener('blur', () => {
+    interactionEngine.resetHome();
+    resetCardTilt();
+});
 window.addEventListener('keydown', event => {
     if (event.key === 'Escape') closeReveal();
 });
@@ -1423,6 +1577,7 @@ async function triggerSummon() {
             duration: 0.4,
             onStart: () => {
                 clearSummonScene();
+                interactionEngine.resetHome();
                 // Ensure scale starts normal to prepare for camera zoom
                 gsap.set(summonOverlay, { scale: 1 });
                 summonOverlay.classList.add('active');
