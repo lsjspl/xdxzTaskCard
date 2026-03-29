@@ -83,6 +83,15 @@ const randomChoice = items => items[Math.floor(Math.random() * items.length)];
 const randomRange = (min, max) => Math.random() * (max - min) + min;
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const lerp = (start, end, amount) => start + (end - start) * amount;
+
+function shouldUseLiteFx() {
+    if (typeof window === 'undefined') return false;
+    const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const lowMemoryDevice = typeof navigator !== 'undefined' && Number.isFinite(navigator.deviceMemory) && navigator.deviceMemory <= 4;
+    const lowCpuDevice = typeof navigator !== 'undefined' && Number.isFinite(navigator.hardwareConcurrency) && navigator.hardwareConcurrency <= 4;
+    return Boolean(prefersReducedMotion || lowMemoryDevice || lowCpuDevice);
+}
+
 let lastTiltDebugAt = 0;
 let pendingTiltPoint = null;
 let tiltRafId = 0;
@@ -639,6 +648,8 @@ class BackgroundEngine {
         setCanvasSize(this.canvas, this.ctx);
         this.width = window.innerWidth;
         this.height = window.innerHeight;
+        this.isMobileViewport = this.width <= 768;
+        this.fxVisibilityBoost = this.isMobileViewport ? 1.28 : 1;
     }
 
     seed() {
@@ -720,6 +731,9 @@ class SummonFxEngine {
         setCanvasSize(this.canvas, this.ctx);
         this.width = window.innerWidth;
         this.height = window.innerHeight;
+        this.isMobileViewport = this.width <= 768;
+        this.liteFx = shouldUseLiteFx();
+        this.fxVisibilityBoost = this.isMobileViewport ? 1.28 : 1;
     }
 
     start(rarity) {
@@ -752,12 +766,14 @@ class SummonFxEngine {
         this.phase = phase;
         this.phaseTime = 0;
         if (phase === 'charge') {
-            this.seedInward(40);
+            this.seedInward(this.liteFx ? 28 : 40);
         } else if (phase === 'compress') {
-            this.seedInward(90);
+            this.seedInward(this.liteFx ? 64 : 90);
             this.spawnWave(70, 0.2, 2.2);
         } else if (phase === 'tear') {
-            const streakCount = this.palette === RARITY_THEME.hard.fx ? 300 : 180;
+            const streakCount = this.palette === RARITY_THEME.hard.fx
+                ? (this.liteFx ? 180 : 300)
+                : (this.liteFx ? 120 : 180);
             for (let i = 0; i < streakCount; i += 1) this.spawnBurstStreak();
             this.spawnWave(54, 0.75, 5.2);
             this.spawnWave(84, 0.56, 4.3);
@@ -771,7 +787,8 @@ class SummonFxEngine {
     seedAmbient() {
         const centerX = this.width / 2;
         const centerY = this.height / 2;
-        this.ambient = Array.from({ length: 96 }, () => {
+        const ambientCount = this.liteFx ? 58 : 96;
+        this.ambient = Array.from({ length: ambientCount }, () => {
             const angle = Math.random() * Math.PI * 2;
             const radius = randomRange(80, Math.min(this.width, this.height) * 0.42);
             return {
@@ -868,27 +885,31 @@ class SummonFxEngine {
 
         const riftGlow = this.phase === 'charge' ? 0.76 : this.phase === 'compress' ? 1.18 : 1.42;
 
-        const centerGlow = this.ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 320);
-        centerGlow.addColorStop(0, `rgba(${this.palette[1]},${0.12 + riftGlow * 0.14})`);
-        centerGlow.addColorStop(0.3, `rgba(${this.palette[0]},${0.1 + riftGlow * 0.12})`);
+        const centerGlowRadius = this.isMobileViewport ? 360 : 320;
+        const boostedCoreAlpha = (0.12 + riftGlow * 0.14) * this.fxVisibilityBoost;
+        const boostedMidAlpha = (0.1 + riftGlow * 0.12) * this.fxVisibilityBoost;
+        const centerGlow = this.ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, centerGlowRadius);
+        centerGlow.addColorStop(0, `rgba(${this.palette[1]},${Math.min(boostedCoreAlpha, 0.9)})`);
+        centerGlow.addColorStop(0.3, `rgba(${this.palette[0]},${Math.min(boostedMidAlpha, 0.78)})`);
         centerGlow.addColorStop(1, 'rgba(255,255,255,0)');
         this.ctx.fillStyle = centerGlow;
         this.ctx.beginPath();
-        this.ctx.arc(centerX, centerY, 320, 0, Math.PI * 2);
+        this.ctx.arc(centerX, centerY, centerGlowRadius, 0, Math.PI * 2);
         this.ctx.fill();
 
         if (this.phase === 'charge' || this.phase === 'compress' || this.phase === 'tear') {
             const phaseEnergy = this.phase === 'charge' ? 0.45 : this.phase === 'compress' ? 0.72 : 0.96;
             for (let i = 0; i < 3; i += 1) {
                 const ringRadius = 86 + i * 34 + Math.sin(this.phaseTime * 0.04 + i) * 8;
-                const alpha = (0.08 + phaseEnergy * 0.16) * (1 - i * 0.18);
+                const alpha = (0.08 + phaseEnergy * 0.16) * (1 - i * 0.18) * this.fxVisibilityBoost;
                 this.ctx.save();
                 this.ctx.translate(centerX, centerY);
                 this.ctx.rotate(this.phaseTime * (0.01 + i * 0.004) * (i % 2 === 0 ? 1 : -1));
-                this.ctx.strokeStyle = `rgba(${this.palette[i % this.palette.length]},${alpha})`;
-                this.ctx.lineWidth = 1.4 + i * 0.8;
-                this.ctx.shadowBlur = 20 + i * 8;
-                this.ctx.shadowColor = `rgba(${this.palette[i % this.palette.length]},${alpha})`;
+                this.ctx.strokeStyle = `rgba(${this.palette[i % this.palette.length]},${Math.min(alpha, 0.92)})`;
+                this.ctx.lineWidth = (1.4 + i * 0.8) * (this.isMobileViewport ? 1.2 : 1);
+                this.ctx.shadowBlur = (20 + i * 8) * (this.isMobileViewport ? 1.25 : 1);
+                this.ctx.shadowColor = `rgba(${this.palette[i % this.palette.length]},${Math.min(alpha, 0.92)})`;
+
                 this.ctx.beginPath();
                 this.ctx.ellipse(0, 0, ringRadius, ringRadius * 0.58, 0, 0, Math.PI * 2);
                 this.ctx.stroke();
@@ -918,11 +939,14 @@ class SummonFxEngine {
         });
 
         if ((this.phase === 'charge' || this.phase === 'compress') && this.phaseTime % (this.phase === 'compress' ? 1 : 2) === 0) {
-            const count = this.phase === 'compress' ? 7 : 4;
+            const count = this.phase === 'compress'
+                ? (this.liteFx ? 4 : 7)
+                : (this.liteFx ? 2 : 4);
             for (let i = 0; i < count; i += 1) this.spawnInwardShard();
         }
         if (this.phase === 'tear' && this.phaseTime < 20) {
-            for (let i = 0; i < 18; i += 1) this.spawnBurstStreak();
+            const burstCount = this.liteFx ? 10 : 18;
+            for (let i = 0; i < burstCount; i += 1) this.spawnBurstStreak();
         }
 
         this.inward = this.inward.filter(shard => {
