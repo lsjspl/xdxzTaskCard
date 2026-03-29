@@ -337,6 +337,8 @@ body {
   font-family: var(--font-title);
   color: #fff8ee;
   overflow: hidden;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .summon-btn {
@@ -401,16 +403,16 @@ body {
 
 #summon-overlay[data-rarity="easy"],
 #card-reveal-overlay[data-rarity="easy"] {
-  --accent-main: 255, 194, 46;
-  --accent-soft: 255, 231, 138;
-  --accent-cold: 255, 248, 216;
+  --accent-main: 112, 196, 255;
+  --accent-soft: 168, 221, 255;
+  --accent-cold: 224, 244, 255;
 }
 
 #summon-overlay[data-rarity="normal"],
 #card-reveal-overlay[data-rarity="normal"] {
-  --accent-main: 255, 194, 46;
-  --accent-soft: 255, 231, 138;
-  --accent-cold: 255, 248, 216;
+  --accent-main: 180, 100, 255;
+  --accent-soft: 210, 160, 255;
+  --accent-cold: 240, 230, 255;
 }
 
 #summon-overlay[data-rarity="hard"],
@@ -418,6 +420,13 @@ body {
   --accent-main: 255, 194, 46;
   --accent-soft: 255, 231, 138;
   --accent-cold: 255, 248, 216;
+}
+
+#summon-overlay[data-rarity="epic"],
+#card-reveal-overlay[data-rarity="epic"] {
+  --accent-main: 255, 60, 100;
+  --accent-soft: 255, 140, 160;
+  --accent-cold: 255, 200, 210;
 }
 
 #summon-overlay {
@@ -447,10 +456,10 @@ body {
   opacity: var(--bridge-alpha);
   z-index: 8;
   background:
-    radial-gradient(circle at var(--bridge-x) var(--bridge-y), rgba(var(--accent-soft), 0.62) 0%, rgba(var(--accent-main), 0.34) 12%, transparent 34%),
-    conic-gradient(from 45deg at var(--bridge-x) var(--bridge-y), transparent 0deg, rgba(var(--accent-main), 0.2) 18deg, transparent 46deg, rgba(var(--accent-cold), 0.26) 88deg, transparent 134deg, rgba(var(--accent-main), 0.18) 188deg, transparent 360deg);
+    radial-gradient(circle at var(--bridge-x) var(--bridge-y), rgba(var(--accent-soft), 0.72) 0%, rgba(var(--accent-main), 0.45) 15%, transparent 40%),
+    conic-gradient(from 45deg at var(--bridge-x) var(--bridge-y), transparent 0deg, rgba(var(--accent-main), 0.28) 18deg, transparent 46deg, rgba(var(--accent-cold), 0.32) 88deg, transparent 134deg, rgba(var(--accent-main), 0.22) 188deg, transparent 360deg);
   filter: blur(10px);
-  mix-blend-mode: screen;
+  mix-blend-mode: multiply;
   transition: opacity 0.28s ease;
 }
 
@@ -495,10 +504,16 @@ body {
 
 .summon-backdrop {
   overflow: hidden;
-  background:
-    radial-gradient(circle at 50% 50%, rgba(var(--accent-main), 0.18) 0%, transparent 24%),
-    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.42) 0%, transparent 44%),
-    linear-gradient(180deg, rgba(255, 248, 231, 0.86) 0%, rgba(248, 233, 204, 0.9) 34%, rgba(244, 224, 186, 0.96) 100%);
+  background: #ffffff;
+  transition: background 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#summon-overlay[data-rarity="hard"] .summon-backdrop {
+  background: #fff9e6; /* Light warm golden */
+}
+
+#summon-overlay[data-rarity="epic"] .summon-backdrop {
+  background: #fff0f3; /* Light soft crimson */
 }
 
 .summon-backdrop::before,
@@ -508,7 +523,7 @@ body {
   inset: -22%;
   pointer-events: none;
   opacity: 0;
-  mix-blend-mode: screen;
+  mix-blend-mode: multiply;
   transition: opacity 0.3s ease;
 }
 
@@ -529,11 +544,11 @@ body {
 .summon-grid {
   inset: auto 0 0;
   height: 70vh;
-  opacity: 0.32;
+  opacity: 0.15;
   background:
-    linear-gradient(180deg, transparent 0%, rgba(var(--accent-main), 0.2) 100%),
-    repeating-linear-gradient(90deg, rgba(var(--accent-main), 0.18) 0 2px, transparent 2px 9vw),
-    repeating-linear-gradient(180deg, rgba(var(--accent-main), 0.14) 0 2px, transparent 2px 8vh);
+    linear-gradient(180deg, transparent 0%, rgba(var(--accent-main), 0.4) 100%),
+    repeating-linear-gradient(90deg, rgba(var(--accent-main), 0.3) 0 1px, transparent 1px 9vw),
+    repeating-linear-gradient(180deg, rgba(var(--accent-main), 0.3) 0 1px, transparent 1px 8vh);
   transform-origin: 50% 100%;
   transform: perspective(900px) rotateX(78deg) scaleY(1.6);
   filter: blur(0.4px);
@@ -546,128 +561,160 @@ body {
   transform: translateX(-50%);
   width: var(--rift-width, 0px);
   height: 100vh;
-  background: #ffffff;
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    rgba(var(--accent-main), 0.2) 10%,
+    rgba(var(--accent-main), 0.95) 30%, 
+    #ffffff 50%, 
+    rgba(var(--accent-main), 0.95) 70%, 
+    rgba(var(--accent-main), 0.2) 90%,
+    transparent 100%
+  );
   box-shadow: 
-    0 0 30px 10px rgba(255, 255, 255, 0.9),
-    0 0 80px 40px rgba(var(--accent-main), 0.8),
-    0 0 120px 60px rgba(var(--accent-main), 0.5);
-  z-index: 9;
+    0 0 60px 30px rgba(var(--accent-main), 0.6),
+    0 0 120px 60px rgba(var(--accent-main), 0.4),
+    0 0 200px 100px rgba(var(--accent-main), 0.2);
+  z-index: 4;
   opacity: 0;
-  transition: width 0.1s, opacity 0.3s;
+  transition: width 0.15s cubic-bezier(0.1, 0, 0.3, 1), opacity 0.3s;
   pointer-events: none;
+  mix-blend-mode: multiply;
 }
 
 .summon-gate-left,
 .summon-gate-right {
   position: absolute;
   top: 0;
-  width: 50.5%;
+  width: 50%;
   height: 100%;
   z-index: 10;
-  background:
-    linear-gradient(to right, rgba(255, 253, 248, 0.96) 0%, rgba(247, 231, 192, 0.98) 85%, rgba(var(--accent-main), 0.3) 100%),
-    radial-gradient(circle at 10px 10px, rgba(255, 194, 46, 0.08) 2px, transparent 2px) 0 0 / 20px 20px;
-  box-shadow: 
-    inset 0 0 60px rgba(255, 194, 46, 0.15),
-    10px 0 40px rgba(0,0,0,0.15);
-  overflow: visible;
+  background: 
+    linear-gradient(135deg, #ffde7a 0%, #ffc22e 50%, #f5ad00 100%);
+  box-shadow: inset 0 0 80px rgba(130, 80, 0, 0.4);
+  overflow: hidden; 
+  border-right: 2px solid rgba(255, 255, 255, 0.9);
 }
 
 .summon-gate-left::before,
 .summon-gate-right::before {
   content: "";
   position: absolute;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 50px;
-  height: 140px;
-  background: linear-gradient(90deg, #ffb300 0%, #ffe680 100%);
-  border-radius: 140px 0 0 140px;
-  box-shadow: 
-    0 0 40px rgba(255, 194, 46, 0.6),
-    inset 4px 0 10px rgba(255, 255, 255, 0.5);
-  z-index: 12;
+  inset: 0;
+  background:
+    radial-gradient(circle at 20% 40px, rgba(255, 255, 255, 0.8) 1.5px, transparent 1.5px),
+    radial-gradient(circle at 60% 80px, rgba(255, 255, 255, 0.6) 2px, transparent 2px),
+    radial-gradient(circle at 80% 20px, rgba(255, 255, 255, 0.9) 1px, transparent 1px);
+  background-size: 160px 160px;
+  opacity: 0.5;
 }
 
-.summon-gate-left::after,
-.summon-gate-right::after {
-  content: "";
+/* Replaced the giant confusing vertical lines with a delicate dashed border */
+.gate-lines {
   position: absolute;
-  right: 0;
-  top: 0;
-  width: 8px;
-  height: 100%;
-  background: linear-gradient(180deg, transparent 0%, #ffd54f 20%, #ffffff 50%, #ffd54f 80%, transparent 100%);
-  z-index: 11;
-  box-shadow: 0 0 30px rgba(255, 194, 46, 0.8);
-  transition: box-shadow 0.2s, background 0.2s;
-}
-
-.gate-deco {
-  position: absolute;
-  inset: 4% 12% 4% 6%;
-  border: 2px solid rgba(255, 194, 46, 0.4);
-  border-radius: 24px;
+  inset: 12px;
+  border: 2px dashed rgba(255, 255, 255, 0.4);
+  border-right: none;
+  border-radius: 12px 0 0 12px;
   pointer-events: none;
 }
 
-.gate-deco::before {
-  content: "";
+/* Magical Split Compass Seal */
+.gate-seal-base, .gate-seal-inner {
   position: absolute;
-  inset: 12px;
-  border: 2px dashed rgba(255, 194, 46, 0.3);
-  border-radius: 14px;
+  right: 0;
+  top: 50%;
+  border-radius: 50%;
+  transform: translateY(-50%) translateX(50%);
+  z-index: 12;
 }
+
+.gate-seal-base {
+  width: 320px;
+  height: 320px;
+  border: 2px dashed rgba(var(--accent-main), 0.4);
+  background: radial-gradient(circle, rgba(var(--accent-main), 0.1) 0%, transparent 60%);
+}
+
+.gate-seal-inner {
+  width: 180px;
+  height: 180px;
+  background: linear-gradient(45deg, #ffc22e 0%, #ffe680 50%, #f5ad00 100%);
+  box-shadow: 
+    0 0 50px rgba(255, 194, 46, 0.8),
+    inset 0 0 20px rgba(255, 255, 255, 0.8);
+  border: 4px solid #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: filter 0.2s, drop-shadow 0.2s;
+}
+
+.gate-seal-inner::after {
+  content: "✦";
+  font-size: 90px;
+  color: #fff;
+  text-shadow: 0 0 30px rgba(255,255,255,1);
+}
+
+/* Rarity-specific gate seal colors removed to keep the ball consistent while the light leaks through */
+
 
 .summon-gate-left {
   left: 0;
-  transform: translateX(calc(-100% + var(--gate-open, 50.1vw)));
+  transform: translateX(calc(-100% + var(--gate-open, 50vw)));
 }
 
 .summon-gate-right {
   right: 0;
-  transform: scaleX(-1) translateX(calc(-100% + var(--gate-open, 50.1vw)));
+  transform: scaleX(-1) translateX(calc(-100% + var(--gate-open, 50vw)));
 }
 
-#summon-overlay.phase-charge {
-  --gate-open: 49vw;
-}
 #summon-overlay.phase-charge .summon-rift {
   opacity: 1;
-  --rift-width: 6px;
+  --rift-width: 28px; /* Wider initial rift for premium feel */
+  animation: rift-pulse 0.08s infinite alternate;
 }
 
-#summon-overlay.phase-compress {
-  --gate-open: 51vw;
+@keyframes rift-pulse {
+  to { filter: brightness(1.7); --rift-width: 14px; }
 }
+
 #summon-overlay.phase-compress .summon-rift {
   opacity: 1;
-  --rift-width: 20px;
+  --rift-width: 14px; /* Light condensed but still visible */
   box-shadow: 
-    0 0 60px 20px rgba(255, 255, 255, 1),
-    0 0 140px 60px rgba(var(--accent-main), 1),
-    0 0 240px 100px rgba(var(--accent-main), 0.8);
+    0 0 80px 40px rgba(255, 255, 255, 1),
+    0 0 180px 90px rgba(var(--accent-main), 1),
+    0 0 400px 180px rgba(var(--accent-main), 0.95);
+}
+
+/* Light up the central seal dramatically when charging */
+#summon-overlay.phase-charge .gate-seal-inner {
+  filter: brightness(1.8) drop-shadow(0 0 50px rgba(255, 255, 255, 0.8));
+  animation: seal-shake 0.1s infinite;
+}
+
+#summon-overlay.phase-compress .gate-seal-inner {
+  filter: brightness(3) drop-shadow(0 0 100px #fff);
+}
+
+@keyframes seal-shake {
+  0% { transform: translateY(calc(-50% - 2px)) translateX(calc(50% + 2px)); }
+  100% { transform: translateY(calc(-50% + 2px)) translateX(calc(50% - 2px)); }
 }
 
 #summon-overlay.phase-compress .summon-gate-left,
 #summon-overlay.phase-compress .summon-gate-right {
-  box-shadow: 0 0 80px rgba(var(--accent-main), 0.8);
+  box-shadow: 
+    inset 0 0 120px rgba(var(--accent-main), 0.6),
+    inset 0 0 240px rgba(0, 0, 0, 0.3);
+  border-right-color: #fff;
 }
 
-#summon-overlay.phase-compress .summon-gate-left::after,
-#summon-overlay.phase-compress .summon-gate-right::after {
-  box-shadow: 0 0 50px 10px rgba(255, 255, 255, 0.8);
-  background: #ffffff;
-}
-
-#summon-overlay.phase-tear {
-  --gate-open: -40vw;
-}
 #summon-overlay.phase-tear .summon-rift {
   opacity: 1;
   --rift-width: 150vw;
-  transition: width 0.38s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 #summon-overlay.phase-tear .summon-gate-left,
@@ -826,15 +873,14 @@ body {
 
 #summon-fx-canvas {
   z-index: 5;
-  mix-blend-mode: screen;
+  mix-blend-mode: multiply;
 }
 
 #white-flash {
   z-index: 6;
   opacity: 0;
   pointer-events: none;
-  background:
-    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.4) 24%, rgba(255, 255, 255, 0.08) 56%, transparent 100%);
+  background: #ffffff; /* Solid white for a clean wash transition on white background */
 }
 
 #summon-overlay.phase-tear #white-flash {
@@ -904,18 +950,41 @@ body {
     from 0deg,
     transparent 0deg,
     rgba(255, 255, 255, 0.8) 5deg,
-    rgba(var(--accent-main), 1) 12deg,
+    rgba(255, 194, 46, 1) 12deg,
     transparent 20deg,
-    rgba(var(--accent-main), 0.9) 40deg,
+    rgba(255, 194, 46, 0.9) 40deg,
     rgba(255, 255, 255, 0.7) 45deg,
     transparent 60deg,
     rgba(255, 215, 0, 0.8) 90deg,
     transparent 120deg,
     rgba(255, 255, 255, 0.9) 160deg,
-    rgba(var(--accent-main), 1) 170deg,
+    rgba(255, 194, 46, 1) 170deg,
     transparent 200deg
   );
-  filter: drop-shadow(0 0 20px rgba(var(--accent-main), 0.8));
+  filter: drop-shadow(0 0 20px rgba(255, 194, 46, 0.8));
+}
+
+#summon-overlay[data-rarity="epic"] .impact-radial-beams {
+  opacity: 1;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    rgba(255, 255, 255, 0.9) 5deg,
+    rgba(255, 60, 100, 1) 12deg,
+    transparent 22deg,
+    rgba(255, 60, 100, 0.8) 45deg,
+    rgba(255, 255, 255, 0.6) 52deg,
+    transparent 65deg,
+    rgba(255, 20, 60, 0.9) 100deg,
+    transparent 130deg,
+    rgba(255, 255, 255, 0.8) 175deg,
+    rgba(255, 60, 100, 1) 185deg,
+    transparent 210deg,
+    rgba(255, 60, 100, 0.7) 270deg,
+    transparent 310deg
+  );
+  filter: drop-shadow(0 0 30px rgba(255, 60, 100, 1));
+  animation: beam-spin 3s linear infinite;
 }
 
 @keyframes halo-burst {
@@ -1010,6 +1079,10 @@ body {
   filter: contrast(1.4) saturate(1.4) brightness(1.1);
 }
 
+#summon-overlay.phase-tear[data-rarity="epic"] {
+  filter: contrast(1.6) saturate(1.8) brightness(1.2) hue-rotate(-10deg);
+}
+
 #card-reveal-overlay {
   position: fixed;
   inset: 0;
@@ -1043,8 +1116,14 @@ body {
 /* More Powerful Contrast for Reveal */
 #card-reveal-overlay[data-rarity="hard"] .reveal-backdrop {
   background:
-    radial-gradient(circle at 50% 46%, rgba(255, 255, 255, 0.4) 0%, transparent 50%),
-    linear-gradient(180deg, #1a1a1a 0%, #3d2b1f 100%);
+    radial-gradient(circle at 50% 46%, rgba(255, 220, 80, 0.45) 0%, transparent 60%),
+    linear-gradient(180deg, #fffcf0 0%, #fff9e6 34%, #fff5d1 100%);
+}
+
+#card-reveal-overlay[data-rarity="epic"] .reveal-backdrop {
+  background:
+    radial-gradient(circle at 50% 46%, rgba(255, 60, 100, 0.4) 0%, transparent 60%),
+    linear-gradient(180deg, #fff5f7 0%, #fff0f3 34%, #ffe5ea 100%);
 }
 
 .reveal-beams-bg {
@@ -1072,9 +1151,29 @@ body {
     transparent 0deg,
     rgba(255, 255, 255, 0.3) 10deg,
     transparent 20deg,
-    rgba(var(--accent-main), 0.4) 40deg,
-    transparent 60deg
+    rgba(255, 194, 46, 0.5) 40deg,
+    transparent 60deg,
+    rgba(255, 215, 0, 0.3) 90deg,
+    transparent 120deg
   );
+}
+
+#card-reveal-overlay[data-rarity="epic"].active .reveal-beams-bg {
+  opacity: 0.9;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    rgba(255, 60, 100, 0.5) 8deg,
+    rgba(255, 255, 255, 0.25) 14deg,
+    transparent 22deg,
+    rgba(255, 60, 100, 0.3) 50deg,
+    transparent 70deg,
+    rgba(255, 140, 160, 0.4) 110deg,
+    transparent 140deg,
+    rgba(255, 60, 100, 0.45) 190deg,
+    transparent 220deg
+  );
+  animation: beam-spin 4s linear infinite;
 }
 
 .reveal-horizon {
@@ -1143,7 +1242,7 @@ body {
 
 #confetti-canvas {
   z-index: 2;
-  mix-blend-mode: screen;
+  mix-blend-mode: multiply;
   pointer-events: none;
 }
 
@@ -1291,8 +1390,11 @@ body {
   display: grid;
   place-items: center;
   background:
-    linear-gradient(145deg, rgba(255, 244, 198, 0.82) 0%, rgba(255, 207, 29, 0.96) 100%),
+    linear-gradient(145deg, rgba(var(--accent-main), 0.82) 0%, rgba(var(--accent-main), 1) 100%),
     url('card_back.webp') center/cover no-repeat;
+  box-shadow: 
+    inset 0 0 0 4px rgba(255,255,255,0.4),
+    inset 0 0 25px rgba(0,0,0,0.6);
 }
 
 .face-back::before {
@@ -1344,6 +1446,55 @@ body {
   transform: translateZ(0);
 }
 
+/* Hard theme: golden warm overlay */
+.theme-hard #card-bg-image::after {
+  background:
+    linear-gradient(180deg, rgba(255, 200, 0, 0.22) 0%, transparent 30%, rgba(255, 150, 0, 0.18) 70%, rgba(180, 80, 0, 0.34) 100%),
+    radial-gradient(circle at 28% 14%, rgba(255, 240, 120, 0.52) 0%, transparent 28%);
+}
+
+/* Epic theme: crimson dark overlay - makes bg_hard.jpg look completely different */
+.theme-epic #card-bg-image::after {
+  background:
+    linear-gradient(180deg, rgba(200, 0, 40, 0.38) 0%, rgba(80, 0, 20, 0.52) 40%, rgba(40, 0, 12, 0.72) 100%),
+    radial-gradient(circle at 25% 10%, rgba(255, 80, 120, 0.48) 0%, transparent 32%),
+    radial-gradient(circle at 72% 80%, rgba(180, 0, 60, 0.42) 0%, transparent 28%);
+}
+
+/* Epic animated glow pulse on the card art stage */
+.theme-epic .card-art-stage::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  border-radius: 18px;
+  pointer-events: none;
+  z-index: -1;
+  background: radial-gradient(circle at 50% 30%, rgba(255, 60, 100, 0.5) 0%, transparent 60%);
+  animation: epic-art-pulse 1.8s ease-in-out infinite alternate;
+}
+
+@keyframes epic-art-pulse {
+  0%   { opacity: 0.4; transform: scale(1); }
+  100% { opacity: 0.9; transform: scale(1.04); }
+}
+
+/* Hard animated glow pulse */
+.theme-hard .card-art-stage::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  border-radius: 18px;
+  pointer-events: none;
+  z-index: -1;
+  background: radial-gradient(circle at 50% 30%, rgba(255, 194, 46, 0.45) 0%, transparent 60%);
+  animation: hard-art-pulse 2.2s ease-in-out infinite alternate;
+}
+
+@keyframes hard-art-pulse {
+  0%   { opacity: 0.3; transform: scale(1); }
+  100% { opacity: 0.75; transform: scale(1.03); }
+}
+
 .task-content-wrap {
   position: relative;
   left: auto;
@@ -1391,37 +1542,37 @@ body {
 }
 
 .theme-easy {
-  --accent-main: 93, 214, 255;
-  --accent-soft: 174, 239, 255;
-  --accent-cold: 237, 251, 255;
+  --accent-main: 112, 196, 255;
+  --accent-soft: 168, 221, 255;
+  --accent-cold: 224, 244, 255;
   --face-shell: linear-gradient(180deg, rgba(248, 254, 255, 0.99) 0%, rgba(231, 249, 255, 0.98) 100%);
   --face-border: #dff7ff;
-  --face-outline: rgba(93, 214, 255, 0.68);
-  --face-glow: 0 0 15px rgba(93, 214, 255, 0.4);
+  --face-outline: rgba(112, 196, 255, 0.68);
+  --face-glow: 0 0 25px rgba(112, 196, 255, 0.6);
   --front-inner-glow: inset 0 0 10px rgba(255,255,255,0.6);
   --panel-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(226, 246, 255, 0.9) 100%);
-  --panel-rule: rgba(93, 214, 255, 0.62);
-  --art-divider: rgba(93, 214, 255, 0.56);
+  --panel-rule: rgba(112, 196, 255, 0.8);
+  --art-divider: rgba(112, 196, 255, 0.6);
   --foil-opacity: 0.42;
   --glare-opacity: 0.22;
-  --star-color: #7ad9f0;
+  --star-color: #70c4ff;
 }
 
 .theme-normal {
-  --accent-main: 229, 133, 181;
-  --accent-soft: 255, 226, 240;
-  --accent-cold: 255, 245, 250;
-  --face-shell: linear-gradient(180deg, rgba(255, 251, 254, 0.99) 0%, rgba(255, 240, 248, 0.98) 100%);
-  --face-border: #ffeef7;
-  --face-outline: rgba(229, 133, 181, 0.82);
-  --face-glow: 0 0 20px rgba(229, 133, 181, 0.5);
-  --front-inner-glow: inset 0 0 15px rgba(229, 133, 181, 0.3);
-  --panel-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 235, 246, 0.92) 100%);
-  --panel-rule: rgba(229, 133, 181, 0.56);
-  --art-divider: rgba(229, 133, 181, 0.48);
+  --accent-main: 180, 100, 255;
+  --accent-soft: 210, 160, 255;
+  --accent-cold: 240, 230, 255;
+  --face-shell: linear-gradient(180deg, rgba(255, 251, 254, 0.99) 0%, rgba(252, 240, 255, 0.98) 100%);
+  --face-border: #f7eaff;
+  --face-outline: rgba(180, 100, 255, 0.82);
+  --face-glow: 0 0 30px rgba(180, 100, 255, 0.7);
+  --front-inner-glow: inset 0 0 15px rgba(180, 100, 255, 0.4);
+  --panel-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 235, 255, 0.92) 100%);
+  --panel-rule: rgba(180, 100, 255, 0.8);
+  --art-divider: rgba(180, 100, 255, 0.6);
   --foil-opacity: 0.58;
   --glare-opacity: 0.26;
-  --star-color: #e685b5;
+  --star-color: #b464ff;
 }
 
 .theme-hard {
@@ -1431,19 +1582,37 @@ body {
   --face-shell: linear-gradient(180deg, rgba(255, 252, 238, 0.99) 0%, rgba(255, 243, 203, 0.98) 100%);
   --face-border: #fff4af;
   --face-outline: rgba(255, 194, 46, 0.9);
-  --face-glow: 0 0 30px rgba(255, 194, 46, 0.8);
+  --face-glow: 0 0 40px rgba(255, 194, 46, 0.8);
   --front-inner-glow: inset 0 0 25px rgba(255, 194, 46, 0.6);
   --panel-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 244, 205, 0.92) 100%);
-  --panel-rule: rgba(255, 194, 46, 0.66);
-  --art-divider: rgba(255, 194, 46, 0.62);
+  --panel-rule: rgba(255, 194, 46, 0.8);
+  --art-divider: rgba(255, 194, 46, 0.8);
   --foil-opacity: 0.82;
   --glare-opacity: 0.32;
-  --star-color: #ffb300;
+  --star-color: #ffc22e;
 }
 
-.theme-easy .rarity-badge { background-color: #74d6e4; }
-.theme-normal .rarity-badge { background-color: #e685b5; }
-.theme-hard .rarity-badge { background-color: #ffb300; }
+.theme-epic {
+  --accent-main: 255, 60, 100;
+  --accent-soft: 255, 140, 160;
+  --accent-cold: 255, 200, 210;
+  --face-shell: linear-gradient(180deg, rgba(255, 245, 247, 0.99) 0%, rgba(255, 230, 235, 0.98) 100%);
+  --face-border: #ffd1d7;
+  --face-outline: rgba(255, 60, 100, 0.9);
+  --face-glow: 0 0 50px rgba(255, 60, 100, 1);
+  --front-inner-glow: inset 0 0 35px rgba(255, 60, 100, 0.6);
+  --panel-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 235, 240, 0.92) 100%);
+  --panel-rule: rgba(255, 60, 100, 0.9);
+  --art-divider: rgba(255, 60, 100, 0.8);
+  --foil-opacity: 0.95;
+  --glare-opacity: 0.4;
+  --star-color: #ff3c64;
+}
+
+.theme-easy .rarity-badge { background-color: rgb(var(--accent-main)); }
+.theme-normal .rarity-badge { background-color: rgb(var(--accent-main)); }
+.theme-hard .rarity-badge { background-color: rgb(var(--accent-main)); }
+.theme-epic .rarity-badge { background-color: rgb(var(--accent-main)); }
 
 .card-glare {
   position: absolute;

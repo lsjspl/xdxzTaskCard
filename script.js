@@ -30,7 +30,7 @@ const RARITY_THEME = {
         bg: 'bg_easy.jpg',
         char: 'char_1.webp',
         fallbackTask: '去喷泉边散散步',
-        fx: ['255, 194, 46', '255, 231, 138', '255, 248, 216']
+        fx: ['112, 196, 255', '168, 221, 255', '224, 244, 255']
     },
     normal: {
         label: '普通',
@@ -39,7 +39,7 @@ const RARITY_THEME = {
         bg: 'bg_normal.jpg',
         char: 'char_2.webp',
         fallbackTask: '收下一份今天的惊喜',
-        fx: ['255, 194, 46', '255, 231, 138', '255, 248, 216']
+        fx: ['180, 100, 255', '210, 160, 255', '240, 230, 255']
     },
     hard: {
         label: '困难',
@@ -47,8 +47,17 @@ const RARITY_THEME = {
         card: 'card_back.webp',
         bg: 'bg_hard.jpg',
         char: 'char_3.webp',
-        fallbackTask: '挑战一次传奇任务',
+        fallbackTask: '挑战一次困难任务',
         fx: ['255, 194, 46', '255, 231, 138', '255, 248, 216']
+    },
+    epic: {
+        label: '史诗',
+        stars: '★ ★ ★ ★ ★',
+        card: 'card_back.webp',
+        bg: 'bg_hard.jpg',
+        char: 'char_6.webp',
+        fallbackTask: '完成一次不可思议的史诗任务',
+        fx: ['255, 60, 100', '255, 140, 160', '255, 200, 210']
     }
 };
 
@@ -68,7 +77,8 @@ const TIMING = {
 const FIXED_FX_RARITY = 'hard';
 
 let isSummoning = false;
-let taskData = { easy: [], normal: [], hard: [] };
+let taskData = { easy: [], normal: [], hard: [], epic: [] };
+let RARITY_WEIGHTS = { easy: 45, normal: 35, hard: 15, epic: 5 };
 let activeTiltPointerId = null;
 let activeTouchId = null;
 let gyroTiltEnabled = false;
@@ -158,17 +168,27 @@ async function loadTasks() {
     try {
         const response = await fetch('tasks.md');
         const text = await response.text();
-        const parsed = { easy: [], normal: [], hard: [] };
+        const parsed = { easy: [], normal: [], hard: [], epic: [] };
         let currentCategory = '';
 
         text.split('\n').forEach(line => {
             const trimmed = line.trim();
             const lower = trimmed.toLowerCase();
 
-            if (lower.startsWith('## easy')) currentCategory = 'easy';
-            else if (lower.startsWith('## normal')) currentCategory = 'normal';
-            else if (lower.startsWith('## hard')) currentCategory = 'hard';
-            else if (trimmed.startsWith('- ') && currentCategory) {
+            let match;
+            if ((match = lower.match(/^##\s*(easy|简单)\s*(?:\[(\d+)\])?/))) {
+                currentCategory = 'easy';
+                if (match[2]) RARITY_WEIGHTS.easy = parseInt(match[2], 10);
+            } else if ((match = lower.match(/^##\s*(normal|普通)\s*(?:\[(\d+)\])?/))) {
+                currentCategory = 'normal';
+                if (match[2]) RARITY_WEIGHTS.normal = parseInt(match[2], 10);
+            } else if ((match = lower.match(/^##\s*(hard|困难)\s*(?:\[(\d+)\])?/))) {
+                currentCategory = 'hard';
+                if (match[2]) RARITY_WEIGHTS.hard = parseInt(match[2], 10);
+            } else if ((match = lower.match(/^##\s*(epic|史诗)\s*(?:\[(\d+)\])?/))) {
+                currentCategory = 'epic';
+                if (match[2]) RARITY_WEIGHTS.epic = parseInt(match[2], 10);
+            } else if (trimmed.startsWith('- ') && currentCategory) {
                 const parts = trimmed.slice(2).split('|').map(s => s.trim());
                 parsed[currentCategory].push({
                     text: parts[0],
@@ -185,8 +205,14 @@ async function loadTasks() {
 }
 
 function drawDestiny() {
-    const rarityPool = ['easy', 'normal', 'hard'];
-    const rarity = randomChoice(rarityPool);
+    let totalWeight = RARITY_WEIGHTS.easy + RARITY_WEIGHTS.normal + RARITY_WEIGHTS.hard + RARITY_WEIGHTS.epic;
+    let roll = Math.random() * totalWeight;
+    
+    let rarity = 'easy';
+    if (roll < RARITY_WEIGHTS.epic) rarity = 'epic';
+    else if (roll < RARITY_WEIGHTS.epic + RARITY_WEIGHTS.hard) rarity = 'hard';
+    else if (roll < RARITY_WEIGHTS.epic + RARITY_WEIGHTS.hard + RARITY_WEIGHTS.normal) rarity = 'normal';
+    
     const theme = RARITY_THEME[rarity];
     const pool = taskData[rarity];
 
@@ -198,19 +224,19 @@ function drawDestiny() {
 }
 
 function getFxRarity() {
-    return FIXED_FX_RARITY;
+    return 'hard'; // Mock deprecated
 }
 
-function applyDestinySkin(destiny) {
+function applyDestinySkin(destiny, initialFxRarity) {
     const theme = RARITY_THEME[destiny.rarity];
-    const fxRarity = getFxRarity();
+    const fxRarity = initialFxRarity || destiny.rarity;
     const charPop = document.getElementById('card-char-pop');
     const foil = document.getElementById('card-holographic-foil');
 
     summonOverlay.dataset.rarity = fxRarity;
-    cardRevealOverlay.dataset.rarity = fxRarity;
+    cardRevealOverlay.dataset.rarity = fxRarity; // Start with initial, then upgrade if fakeout
 
-    theCard.classList.remove('theme-easy', 'theme-normal', 'theme-hard');
+    theCard.classList.remove('theme-easy', 'theme-normal', 'theme-hard', 'theme-epic');
     theCard.classList.add(`theme-${destiny.rarity}`);
 
     rarityText.textContent = theme.label;
@@ -660,18 +686,38 @@ function triggerShake(intensity = 'medium') {
     }, duration);
 }
 
-function triggerImpactFrame() {
+function triggerImpactFrame(rarity = 'hard') {
+    const theme = RARITY_THEME[rarity] || RARITY_THEME.hard;
+    const color = theme.fx[0];
     const frame = document.createElement('div');
     frame.style.cssText = `
         position: fixed;
         inset: 0;
-        z-index: 9999;
-        background: white;
-        mix-blend-mode: difference;
+        background: radial-gradient(circle at 50% 50%, rgba(${color}, 0.85) 0%, rgba(${color}, 0.3) 50%, transparent 80%);
+        mix-blend-mode: multiply;
         pointer-events: none;
+        filter: blur(12px);
     `;
     document.body.appendChild(frame);
-    setTimeout(() => frame.remove(), 40);
+    
+    gsap.fromTo(frame, 
+        { scale: 0.3, opacity: 0 },
+        { 
+            scale: 2.2, 
+            opacity: 1, 
+            duration: 0.14, 
+            ease: "power2.out", 
+            onComplete: () => {
+                gsap.to(frame, { 
+                    opacity: 0, 
+                    scale: 3,
+                    duration: 0.35, 
+                    ease: "power1.in",
+                    onComplete: () => frame.remove() 
+                });
+            }
+        }
+    );
 }
 
 async function collapseReveal() {
@@ -832,15 +878,22 @@ class SummonFxEngine {
             this.seedInward(this.liteFx ? 64 : 90);
             this.spawnWave(70, 0.2, 2.2);
         } else if (phase === 'tear') {
-            const streakCount = this.palette === RARITY_THEME.hard.fx
-                ? (this.liteFx ? 180 : 300)
+            const isEpic = this.palette === RARITY_THEME.epic.fx;
+            const isHard = this.palette === RARITY_THEME.hard.fx;
+            const streakCount = (isHard || isEpic)
+                ? (this.liteFx ? 220 : 380)
                 : (this.liteFx ? 120 : 180);
             for (let i = 0; i < streakCount; i += 1) this.spawnBurstStreak();
             this.spawnWave(54, 0.75, 5.2);
             this.spawnWave(84, 0.56, 4.3);
-            if (this.palette === RARITY_THEME.hard.fx) {
+            if (isHard) {
                 this.spawnWave(120, 0.8, 8);
                 this.spawnWave(180, 0.4, 12);
+            }
+            if (isEpic) {
+                this.spawnWave(100, 1.0, 10);
+                this.spawnWave(160, 0.7, 14);
+                this.spawnWave(240, 0.5, 18);
             }
         } else if (phase === 'bridge') {
             this.spawnWave(72, 0.52, 4.4);
@@ -952,7 +1005,7 @@ class SummonFxEngine {
         this.phaseTime += 1;
         this.ctx.clearRect(0, 0, this.width, this.height);
         this.ctx.save();
-        this.ctx.globalCompositeOperation = 'screen';
+        this.ctx.globalCompositeOperation = 'multiply';
 
         const riftGlow = this.phase === 'charge' ? 0.76 : this.phase === 'compress' ? 1.18 : 1.42;
 
@@ -1197,7 +1250,7 @@ class RevealFxEngine {
         this.time += 1;
         this.ctx.clearRect(0, 0, this.width, this.height);
         this.ctx.save();
-        this.ctx.globalCompositeOperation = 'screen';
+        this.ctx.globalCompositeOperation = 'multiply';
         this.rings = this.rings.filter(ring => {
             ring.radius += ring.speed;
             ring.alpha *= 0.97;
@@ -1352,11 +1405,14 @@ async function triggerSummon() {
     try {
         await ensureGyroTiltAccess();
         const destiny = drawDestiny();
-        const fxRarity = getFxRarity();
+        const finalRarity = destiny.rarity;
+        
+        let initialFxRarity = finalRarity;
+
         const retrying = cardRevealOverlay.classList.contains('active');
         const bridgeTargetX = window.innerWidth / 2;
         const bridgeTargetY = window.innerHeight * 0.46;
-        applyDestinySkin(destiny);
+        applyDestinySkin(destiny, initialFxRarity);
         if (retrying) await collapseReveal();
 
         const mainTl = gsap.timeline({ defaults: { ease: "power2.inOut" } });
@@ -1367,11 +1423,13 @@ async function triggerSummon() {
             duration: 0.4,
             onStart: () => {
                 clearSummonScene();
+                // Ensure scale starts normal to prepare for camera zoom
+                gsap.set(summonOverlay, { scale: 1 });
                 summonOverlay.classList.add('active');
                 summonOverlay.style.setProperty('--bridge-x', `${bridgeTargetX}px`);
                 summonOverlay.style.setProperty('--bridge-y', `${bridgeTargetY}px`);
                 whiteFlash.style.opacity = '0';
-                summonFx.start(fxRarity);
+                summonFx.start(initialFxRarity);
                 summonFx.setBridgeTarget(bridgeTargetX, bridgeTargetY);
                 // Force reset with standard GSAP properties
                 gsap.set(theCard, { rotationX: 0, rotationY: 0, rotationZ: 0, z: 0, scale: 1 });
@@ -1379,36 +1437,60 @@ async function triggerSummon() {
             }
         });
 
+        // Phase 1: Charge (The Struggle) - Intense camera push, door barely cracks, heavy vibrations
         mainTl.add(() => {
             summonOverlay.classList.add('phase-charge');
             summonFx.setPhase('charge');
-            summonFx.setIntensity(1.8);
-        }).to(summonOverlay, { "--gate-open": "48.5vw", duration: 1.6, ease: "sine.inOut" });
+            summonFx.setIntensity(2.0);
+            triggerShake('light');
+            setTimeout(() => triggerShake('light'), 400);
+            setTimeout(() => triggerShake('medium'), 800);
+            setTimeout(() => triggerShake('heavy'), 1200);
+        }).fromTo(summonOverlay, 
+            { scale: 1, "--gate-open": "50vw" }, 
+            { "--gate-open": "49vw", scale: 1.18, duration: 1.8, ease: "power2.in" }
+        );
 
+        // Phase 2: Compress (The Silence) - Freeze and blinding anticipation
         mainTl.add(() => {
             summonOverlay.classList.add('phase-compress');
             summonFx.setPhase('compress');
-            summonFx.setIntensity(2.8);
-            triggerShake('light');
-        }).to(summonOverlay, { "--gate-open": "52vw", duration: 0.7, ease: "back.in(4.2)" });
+            summonFx.setIntensity(5.0);
+        }).to(summonOverlay, { 
+            "--gate-open": "49.5vw", 
+            scale: 1.15, 
+            duration: 0.15, 
+            ease: "power4.out" 
+        });
 
+        // Phase 3: Tear (The Burst) - Explosive velocity, snapping the camera back
         mainTl.add(() => {
             summonOverlay.classList.add('phase-tear');
             summonFx.setPhase('tear');
-            summonFx.setIntensity(fxRarity === 'hard' ? 6.2 : 3.8);
-            triggerShake(fxRarity === 'hard' ? 'heavy' : 'medium');
-            if (fxRarity === 'hard') {
-                triggerImpactFrame();
-                setTimeout(triggerImpactFrame, 80);
+            const isHighRarity = initialFxRarity === 'hard' || initialFxRarity === 'epic';
+            summonFx.setIntensity(initialFxRarity === 'epic' ? 9.0 : initialFxRarity === 'hard' ? 7.0 : 5.0);
+            triggerShake('heavy');
+            if (isHighRarity) {
+                triggerImpactFrame(initialFxRarity);
+                setTimeout(() => triggerImpactFrame(initialFxRarity), 80);
+                if (initialFxRarity === 'epic') {
+                    setTimeout(() => triggerImpactFrame(initialFxRarity), 160);
+                    setTimeout(() => triggerShake('heavy'), 200);
+                }
             }
-        }).to(summonOverlay, { "--gate-open": "-30vw", duration: 0.38, ease: "expo.in" })
+        }).to(summonOverlay, { 
+            "--gate-open": "-45vw", 
+            scale: 1, 
+            duration: 0.55, 
+            ease: "expo.out" 
+        })
             .add(() => {
                 summonOverlay.classList.add('phase-bridge');
                 summonFx.setPhase('bridge');
             }, "-=0.08")
             .to(whiteFlash, { opacity: 1, duration: 0.08 })
             .add(() => {
-                if (fxRarity === 'hard') triggerImpactFrame();
+                if (initialFxRarity === 'hard') triggerImpactFrame('hard');
                 resetRevealScene();
             });
 
@@ -1426,7 +1508,11 @@ async function triggerSummon() {
             )
             .addLabel("slam-moment")
             .add(() => {
-                triggerShake(fxRarity === 'hard' ? 'heavy' : 'medium');
+                triggerShake((finalRarity === 'hard' || finalRarity === 'epic') ? 'heavy' : 'medium');
+                if (finalRarity === 'epic') {
+                    triggerImpactFrame();
+                    setTimeout(triggerImpactFrame, 60);
+                }
                 summonFx.stop();
                 clearSummonScene();
             }, "slam-moment")
@@ -1441,7 +1527,7 @@ async function triggerSummon() {
                 resetGyroBaseline();
                 logTiltDebug('reveal/presented', {}, { force: true });
             })
-            .add(() => revealFx.start(fxRarity, cardStage.getBoundingClientRect()))
+            .add(() => revealFx.start(initialFxRarity, cardStage.getBoundingClientRect()))
             .to({}, {
                 duration: 0.5,
                 onComplete: () => {
@@ -1486,6 +1572,18 @@ async function triggerSummon() {
     }
 }
 
-summonBtn.addEventListener('click', triggerSummon);
-retryBtn.addEventListener('click', triggerSummon);
+function attachInteractions(btn) {
+    btn.addEventListener('click', triggerSummon);
+    // Add aggressive touchend fallback for mobile browsers like Edge Android 
+    // that might cancel native click events during pointermove
+    btn.addEventListener('touchend', (e) => {
+        if (!isSummoning) {
+            e.preventDefault(); // Stop native click from double-firing
+            triggerSummon();
+        }
+    }, { passive: false });
+}
+
+attachInteractions(summonBtn);
+attachInteractions(retryBtn);
 loadTasks();
