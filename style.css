@@ -60,6 +60,12 @@ body.fx-lite .card-char-pop {
     drop-shadow(0 0 10px rgba(255, 255, 255, 0.24));
 }
 
+body.fx-lite .card-far-layer,
+body.fx-lite .card-mid-layer,
+body.fx-lite .card-front-layer {
+  filter: none;
+}
+
 body.fx-lite .card-holographic-foil {
   filter: blur(2px);
 }
@@ -94,8 +100,35 @@ body.fx-lite .retry-btn {
   isolation: isolate;
   z-index: 1;
   transform: translateZ(0);
+  transform-style: preserve-3d;
+  perspective: 960px;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
+}
+
+.card-parallax-layer {
+  position: absolute;
+  left: 50%;
+  background-position: center bottom;
+  background-repeat: no-repeat;
+  pointer-events: none;
+  transform-origin: center bottom;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  will-change: transform, opacity;
+}
+
+.card-parallax-layer[data-layer-state="disabled"] {
+  opacity: 0 !important;
+}
+
+.card-bg-image[data-layer-state="disabled"],
+.card-char-pop[data-layer-state="disabled"] {
+  opacity: 0 !important;
+}
+
+.card-parallax-layer[data-layer-state="placeholder"] {
+  background-size: cover;
 }
 
 .card-bg-image {
@@ -122,6 +155,37 @@ body.fx-lite .retry-btn {
   outline: 1px solid transparent;
 }
 
+.card-far-layer {
+  bottom: -40%;
+  width: 128%;
+  height: 178%;
+  z-index: 2;
+  transform: translateX(-50%) translateZ(28px) scale(1.04);
+  opacity: 0.72;
+  mix-blend-mode: screen;
+  filter: blur(1px) saturate(1.04);
+}
+
+.card-far-layer[data-layer-state="image"] {
+  background-size: contain;
+}
+
+.card-mid-layer {
+  bottom: -62%;
+  width: 122%;
+  height: 176%;
+  z-index: 3;
+  transform: translateX(-50%) translateZ(68px) scale(1.05);
+  opacity: 0.92;
+  filter:
+    drop-shadow(0 14px 28px rgba(28, 18, 18, 0.12))
+    drop-shadow(0 0 20px rgba(255, 255, 255, 0.16));
+}
+
+.card-mid-layer[data-layer-state="image"] {
+  background-size: contain;
+}
+
 .card-char-pop {
   position: absolute;
   left: 50%;
@@ -133,13 +197,30 @@ body.fx-lite .retry-btn {
   background-size: auto 100%;
   background-position: center bottom;
   background-repeat: no-repeat;
-  z-index: 3;
+  z-index: 5;
   opacity: 0.98;
   pointer-events: none;
   transition: transform 0.14s ease-out, filter 0.18s ease-out;
   filter:
     drop-shadow(0 22px 32px rgba(28, 18, 18, 0.22))
     drop-shadow(0 0 18px rgba(255, 255, 255, 0.42));
+}
+
+.card-front-layer {
+  bottom: -8%;
+  width: 124%;
+  height: 92%;
+  z-index: 6;
+  transform: translateX(-50%) translateZ(164px) scale(1.08);
+  opacity: 0.96;
+  mix-blend-mode: screen;
+  filter:
+    drop-shadow(0 12px 22px rgba(28, 18, 18, 0.18))
+    drop-shadow(0 0 16px rgba(255, 255, 255, 0.3));
+}
+
+.card-front-layer[data-layer-state="image"] {
+  background-size: contain;
 }
 
 .card-char-pop::after {
@@ -269,6 +350,7 @@ body.fx-mobile #main-bg-canvas {
   pointer-events: none;
   overflow: hidden;
   perspective: 1200px;
+  transform-style: preserve-3d;
 }
 
 .home-hero-bg {
@@ -280,25 +362,109 @@ body.fx-mobile #main-bg-canvas {
   will-change: transform;
 }
 
+.home-hero-layer {
+  position: absolute;
+  pointer-events: none;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  will-change: transform;
+}
+
+.home-hero-far {
+  top: 4vh;
+  left: -8vw;
+  width: 44vw;
+  height: 22vw;
+  min-width: 260px;
+  min-height: 140px;
+  background-image: url('img/云.webp');
+  opacity: 0.34;
+  z-index: 2;
+  filter: blur(1px);
+}
+
+.home-hero-mid {
+  right: -6vw;
+  top: 12vh;
+  width: 40vw;
+  height: 24vw;
+  min-width: 240px;
+  min-height: 140px;
+  background-image: url('img/云_2.webp');
+  opacity: 0.52;
+  z-index: 3;
+}
+
 .home-hero-char {
   position: absolute;
   left: 50%;
-  bottom: 0;
-  width: 100%;
-  height: 90vh;
+  bottom: 180px;
+  width: 168%;
+  height: 60vh;
   transform: translateX(-50%);
-  background: url('img/char_5.webp') center bottom/contain no-repeat;
-  z-index: 2;
+  background: url('img/一群人物.webp') center bottom/contain no-repeat;
+  z-index: 4;
   will-change: transform;
+}
+
+.home-hero-front {
+  left: 5vw;
+  bottom: 12vh;
+  width: 16vw;
+  height: 28vh;
+  min-width: 96px;
+  min-height: 180px;
+  background-image: url('img/气球.webp');
+  background-position: center bottom;
+  opacity: 0.92;
+  z-index: 5;
 }
 
 /* 移动端响应式锁定：确保角色不再“矮小” */
 @media screen and (max-width: 600px) {
+  .home-hero-bg {
+    position: absolute;
+    inset: -10%;
+    background: url('img/bg.jpg') center center/cover no-repeat;
+    z-index: 1;
+    transform: scale(1.05);
+    will-change: transform;
+  }
+  .home-hero-far {
+    top: 6vh;
+    left: -24vw;
+    width: 74vw;
+    height: 32vw;
+    min-width: 220px;
+    min-height: 108px;
+    opacity: 0.3;
+  }
+  .home-hero-mid {
+    top: 14vh;
+    right: -26vw;
+    width: 78vw;
+    height: 38vw;
+    min-width: 220px;
+    min-height: 120px;
+    opacity: 0.44;
+  }
   .home-hero-char {
-    width: 160%;
-    height: 92vh;
-    background-position: center bottom 40px;
-    background-size: auto 100% !important;
+    top: calc(-4vh + 300px);
+    bottom: auto;
+    width: 240%;
+    height: 50vh;
+    background-position: center top;
+    background-size: auto 108% !important;
+  }
+  .home-hero-front {
+    left: -4vw;
+    bottom: 16vh;
+    width: 30vw;
+    height: 24vh;
+    min-width: 86px;
+    min-height: 140px;
+    opacity: 0.8;
   }
 }
 
@@ -1437,7 +1603,10 @@ body.fx-lite #the-card,
 body.fx-lite .card-inner-wrap,
 body.fx-lite .card-face,
 body.fx-lite .card-bg-image,
-body.fx-lite .card-char-pop {
+body.fx-lite .card-char-pop,
+body.fx-lite .card-far-layer,
+body.fx-lite .card-mid-layer,
+body.fx-lite .card-front-layer {
   will-change: auto;
 }
 

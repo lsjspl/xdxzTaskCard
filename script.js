@@ -11,6 +11,9 @@ const cardInnerWrap = theCard.querySelector('.card-inner-wrap');
 const faceBack = document.querySelector('.face-back');
 const faceFront = document.querySelector('.face-front');
 const cardBgImage = document.getElementById('card-bg-image');
+const cardFarLayer = document.getElementById('card-far-layer');
+const cardMidLayer = document.getElementById('card-mid-layer');
+const cardFrontLayer = document.getElementById('card-front-layer');
 const cardGlare = document.getElementById('card-glare');
 const taskContentWrap = document.querySelector('.task-content-wrap');
 
@@ -22,9 +25,49 @@ const retryBtn = document.getElementById('retry-btn');
 const mainBgCanvas = document.getElementById('main-bg-canvas');
 const confettiCanvas = document.getElementById('confetti-canvas');
 const homeHeroBg = document.getElementById('home-hero-bg');
+const homeHeroFar = document.getElementById('home-hero-far');
+const homeHeroMid = document.getElementById('home-hero-mid');
 const homeHeroChar = document.getElementById('home-hero-char');
+const homeHeroFront = document.getElementById('home-hero-front');
 const cardCharPop = document.getElementById('card-char-pop');
 const cardHolographicFoil = document.getElementById('card-holographic-foil');
+
+const TASK_FILE_CANDIDATES = ['task.md', 'tasks.md'];
+const TASK_LAYER_KEYS = ['bg', 'far', 'mid', 'char', 'front'];
+const TASK_LAYER_ALIASES = {
+    bg: 'bg',
+    background: 'bg',
+    back: 'bg',
+    far: 'far',
+    mid: 'mid',
+    middle: 'mid',
+    char: 'char',
+    character: 'char',
+    front: 'front',
+    foreground: 'front'
+};
+
+const PLACEHOLDER_LAYER_ART = {
+    far: [
+        'radial-gradient(circle at 20% 24%, rgba(var(--accent-cold), 0.9) 0 7%, transparent 18%)',
+        'radial-gradient(circle at 78% 18%, rgba(255, 255, 255, 0.72) 0 7%, transparent 18%)',
+        'radial-gradient(circle at 48% 30%, rgba(var(--accent-soft), 0.48) 0 12%, transparent 24%)',
+        'linear-gradient(180deg, rgba(255, 255, 255, 0.2) 0%, rgba(var(--accent-cold), 0.1) 26%, transparent 72%)'
+    ].join(', '),
+    mid: [
+        'linear-gradient(118deg, transparent 0 28%, rgba(var(--accent-main), 0.18) 40%, transparent 56%)',
+        'linear-gradient(-118deg, transparent 0 36%, rgba(var(--accent-soft), 0.2) 48%, transparent 62%)',
+        'radial-gradient(circle at 50% 70%, rgba(var(--accent-main), 0.22) 0 14%, transparent 32%)',
+        'linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(var(--accent-cold), 0.12) 100%)'
+    ].join(', '),
+    front: [
+        'radial-gradient(circle at 14% 88%, rgba(var(--accent-main), 0.34) 0 6%, transparent 13%)',
+        'radial-gradient(circle at 30% 84%, rgba(var(--accent-soft), 0.28) 0 5%, transparent 11%)',
+        'radial-gradient(circle at 78% 86%, rgba(var(--accent-main), 0.32) 0 6%, transparent 13%)',
+        'radial-gradient(circle at 66% 90%, rgba(var(--accent-cold), 0.68) 0 5%, transparent 10%)',
+        'linear-gradient(180deg, transparent 0%, rgba(255, 255, 255, 0.16) 100%)'
+    ].join(', ')
+};
 
 const RARITY_THEME = {
     easy: {
@@ -219,10 +262,83 @@ function setCanvasSize(canvas, ctx) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 
+function createEmptyTaskLayers() {
+    return {
+        bg: '',
+        far: '',
+        mid: '',
+        char: '',
+        front: ''
+    };
+}
+
+function normalizeTaskLayerValue(rawValue) {
+    const value = rawValue?.trim() ?? '';
+    if (!value) return '';
+    if (/^(none|off|false|0)$/i.test(value)) return null;
+    return value;
+}
+
+function parseTaskConfig(parts) {
+    const layers = createEmptyTaskLayers();
+    const extras = parts.slice(1);
+    let legacyIndex = 0;
+
+    extras.forEach(part => {
+        if (!part) return;
+
+        const separatorIndex = part.indexOf(':');
+        if (separatorIndex > 0) {
+            const rawKey = part.slice(0, separatorIndex).trim().toLowerCase();
+            const key = TASK_LAYER_ALIASES[rawKey];
+            if (!key) return;
+            layers[key] = normalizeTaskLayerValue(part.slice(separatorIndex + 1));
+            return;
+        }
+
+        if (legacyIndex === 0) {
+            layers.bg = normalizeTaskLayerValue(part);
+        } else if (legacyIndex === 1) {
+            layers.char = normalizeTaskLayerValue(part);
+        }
+        legacyIndex += 1;
+    });
+
+    return layers;
+}
+
+async function fetchTaskText() {
+    for (const filename of TASK_FILE_CANDIDATES) {
+        try {
+            const response = await fetch(filename);
+            if (!response.ok) continue;
+            return await response.text();
+        } catch (error) {
+            console.warn(`Task file read skipped: ${filename}`, error);
+        }
+    }
+
+    throw new Error(`Unable to load task data from ${TASK_FILE_CANDIDATES.join(', ')}`);
+}
+
+function setCardLayerAsset(element, layerName, imageValue, fallbackImage = '') {
+    if (!element) return;
+
+    const isDisabled = imageValue === null;
+    const finalImage = isDisabled ? '' : imageValue || fallbackImage || '';
+    const hasImage = Boolean(finalImage);
+    const nextState = isDisabled ? 'disabled' : hasImage ? 'image' : 'placeholder';
+
+    element.dataset.layer = layerName;
+    element.dataset.layerState = nextState;
+    element.style.backgroundImage = hasImage
+        ? `url("${finalImage}")`
+        : PLACEHOLDER_LAYER_ART[layerName] || 'none';
+}
+
 async function loadTasks() {
     try {
-        const response = await fetch('tasks.md');
-        const text = await response.text();
+        const text = await fetchTaskText();
         const parsed = { easy: [], normal: [], hard: [], epic: [] };
         let currentCategory = '';
 
@@ -247,8 +363,7 @@ async function loadTasks() {
                 const parts = trimmed.slice(2).split('|').map(s => s.trim());
                 parsed[currentCategory].push({
                     text: parts[0],
-                    bg: parts[1] || '',
-                    char: parts[2] || ''
+                    layers: parseTaskConfig(parts)
                 });
             }
         });
@@ -273,7 +388,7 @@ function drawDestiny() {
 
     return {
         rarity,
-        task: pool.length ? randomChoice(pool) : { text: theme.fallbackTask, bg: '', char: '' },
+        task: pool.length ? randomChoice(pool) : { text: theme.fallbackTask, layers: createEmptyTaskLayers() },
         bg: theme.bg
     };
 }
@@ -295,16 +410,14 @@ function applyDestinySkin(destiny, initialFxRarity) {
     rarityText.textContent = theme.label;
     taskDesc.textContent = destiny.task.text;
     starsRow.textContent = theme.stars;
-    
-    const bgUrl = destiny.task.bg || theme.bg;
-    cardBgImage.style.backgroundImage = `url("${bgUrl}")`;
-    cardBgImage.style.backgroundColor = 'rgba(255, 248, 238, 0.92)';
 
-    if (cardCharPop) {
-        const charUrl = destiny.task.char || theme.char;
-        cardCharPop.style.backgroundImage = `url('${charUrl}')`;
-        cardCharPop.style.opacity = '1';
-    }
+    const taskLayers = destiny.task.layers || createEmptyTaskLayers();
+    cardBgImage.style.backgroundColor = 'rgba(255, 248, 238, 0.92)';
+    setCardLayerAsset(cardBgImage, 'bg', taskLayers.bg, theme.bg);
+    setCardLayerAsset(cardFarLayer, 'far', taskLayers.far);
+    setCardLayerAsset(cardMidLayer, 'mid', taskLayers.mid);
+    setCardLayerAsset(cardCharPop, 'char', taskLayers.char, theme.char);
+    setCardLayerAsset(cardFrontLayer, 'front', taskLayers.front);
 
     // Reset foil position
     if (cardHolographicFoil) {
@@ -315,12 +428,42 @@ function applyDestinySkin(destiny, initialFxRarity) {
 class InteractionEngine {
     constructor() {
         this.card = {
-            current: { rotationX: 0, rotationY: 0, z: 0, scale: 1, bgX: 0, bgY: 0, bgScale: 1.04, glareX: 0, glareY: 0, glareRotate: 0, foilPosX: 50, foilPosY: 50, foilX: 0, foilY: 0, charX: 0, charY: 8, charZ: 112, charRotateX: 0, charRotateY: 0, charRotateZ: 0, charScale: 1.08 },
-            target: { rotationX: 0, rotationY: 0, z: 0, scale: 1, bgX: 0, bgY: 0, bgScale: 1.04, glareX: 0, glareY: 0, glareRotate: 0, foilPosX: 50, foilPosY: 50, foilX: 0, foilY: 0, charX: 0, charY: 8, charZ: 112, charRotateX: 0, charRotateY: 0, charRotateZ: 0, charScale: 1.08 }
+            current: {
+                rotationX: 0, rotationY: 0, z: 0, scale: 1,
+                bgX: 0, bgY: 0, bgScale: 1.04,
+                farX: 0, farY: 0, farZ: 28, farScale: 1.04,
+                midX: 0, midY: 0, midZ: 68, midScale: 1.05,
+                glareX: 0, glareY: 0, glareRotate: 0,
+                foilPosX: 50, foilPosY: 50, foilX: 0, foilY: 0,
+                charX: 0, charY: 8, charZ: 112, charRotateX: 0, charRotateY: 0, charRotateZ: 0, charScale: 1.08,
+                frontX: 0, frontY: 0, frontZ: 164, frontRotateX: 0, frontRotateY: 0, frontScale: 1.08
+            },
+            target: {
+                rotationX: 0, rotationY: 0, z: 0, scale: 1,
+                bgX: 0, bgY: 0, bgScale: 1.04,
+                farX: 0, farY: 0, farZ: 28, farScale: 1.04,
+                midX: 0, midY: 0, midZ: 68, midScale: 1.05,
+                glareX: 0, glareY: 0, glareRotate: 0,
+                foilPosX: 50, foilPosY: 50, foilX: 0, foilY: 0,
+                charX: 0, charY: 8, charZ: 112, charRotateX: 0, charRotateY: 0, charRotateZ: 0, charScale: 1.08,
+                frontX: 0, frontY: 0, frontZ: 164, frontRotateX: 0, frontRotateY: 0, frontScale: 1.08
+            }
         };
         this.home = {
-            current: { charX: 0, charY: 0, charRotationY: 0, charRotationX: 0, bgX: 0, bgY: 0, bgRotationY: 0, bgRotationX: 0 },
-            target: { charX: 0, charY: 0, charRotationY: 0, charRotationX: 0, bgX: 0, bgY: 0, bgRotationY: 0, bgRotationX: 0 }
+            current: {
+                bgX: 0, bgY: 0, bgRotationY: 0, bgRotationX: 0,
+                farX: 0, farY: 0, farRotationY: 0, farRotationX: 0,
+                midX: 0, midY: 0, midRotationY: 0, midRotationX: 0,
+                charX: 0, charY: 0, charRotationY: 0, charRotationX: 0,
+                frontX: 0, frontY: 0, frontRotationY: 0, frontRotationX: 0
+            },
+            target: {
+                bgX: 0, bgY: 0, bgRotationY: 0, bgRotationX: 0,
+                farX: 0, farY: 0, farRotationY: 0, farRotationX: 0,
+                midX: 0, midY: 0, midRotationY: 0, midRotationX: 0,
+                charX: 0, charY: 0, charRotationY: 0, charRotationX: 0,
+                frontX: 0, frontY: 0, frontRotationY: 0, frontRotationX: 0
+            }
         };
         this.rafId = 0;
         this.cardDirty = true;
@@ -355,6 +498,14 @@ class InteractionEngine {
             bgX: -safeDx * 25,
             bgY: -safeDy * 15,
             bgScale: 1.08,
+            farX: -safeDx * 12,
+            farY: -safeDy * 8,
+            farZ: 34,
+            farScale: 1.06,
+            midX: safeDx * 10,
+            midY: safeDy * 6,
+            midZ: 74,
+            midScale: 1.07,
             glareX: safeDx * 26,
             glareY: safeDy * 26,
             glareRotate: safeDx * 5,
@@ -368,7 +519,13 @@ class InteractionEngine {
             charRotateX: -safeDy * 3.5,
             charRotateY: safeDx * 5,
             charRotateZ: safeDx * 1.2,
-            charScale: 1.08 + Math.abs(safeDx) * 0.015
+            charScale: 1.08 + Math.abs(safeDx) * 0.015,
+            frontX: safeDx * 38,
+            frontY: safeDy * 16,
+            frontZ: 176,
+            frontRotateX: -safeDy * 6,
+            frontRotateY: safeDx * 8,
+            frontScale: 1.12 + Math.abs(safeDx) * 0.02
         });
         this.cardDirty = true;
         this.ensureRunning();
@@ -383,6 +540,14 @@ class InteractionEngine {
             bgX: 0,
             bgY: 0,
             bgScale: 1.04,
+            farX: 0,
+            farY: 0,
+            farZ: 28,
+            farScale: 1.04,
+            midX: 0,
+            midY: 0,
+            midZ: 68,
+            midScale: 1.05,
             glareX: 0,
             glareY: 0,
             glareRotate: 0,
@@ -396,7 +561,13 @@ class InteractionEngine {
             charRotateX: 0,
             charRotateY: 0,
             charRotateZ: 0,
-            charScale: 1.08
+            charScale: 1.08,
+            frontX: 0,
+            frontY: 0,
+            frontZ: 164,
+            frontRotateX: 0,
+            frontRotateY: 0,
+            frontScale: 1.08
         });
         this.cardDirty = true;
         this.ensureRunning();
@@ -406,14 +577,26 @@ class InteractionEngine {
         const safeDx = clamp(dx, -1, 1);
         const safeDy = clamp(dy, -1, 1);
         Object.assign(this.home.target, {
+            bgX: safeDx * -20,
+            bgY: safeDy * -10,
+            bgRotationY: safeDx * -2,
+            bgRotationX: safeDy * 1,
+            farX: safeDx * -12,
+            farY: safeDy * -6,
+            farRotationY: safeDx * -1.4,
+            farRotationX: safeDy * 0.6,
+            midX: safeDx * 18,
+            midY: safeDy * 9,
+            midRotationY: safeDx * 2.2,
+            midRotationX: -safeDy * 1,
             charX: safeDx * 30,
             charY: safeDy * 15,
             charRotationY: safeDx * 5,
             charRotationX: -safeDy * 2,
-            bgX: safeDx * -20,
-            bgY: safeDy * -10,
-            bgRotationY: safeDx * -2,
-            bgRotationX: safeDy * 1
+            frontX: safeDx * 42,
+            frontY: safeDy * 18,
+            frontRotationY: safeDx * 6.5,
+            frontRotationX: -safeDy * 2.6
         });
         this.homeDirty = true;
         this.ensureRunning();
@@ -421,14 +604,26 @@ class InteractionEngine {
 
     resetHome() {
         Object.assign(this.home.target, {
+            bgX: 0,
+            bgY: 0,
+            bgRotationY: 0,
+            bgRotationX: 0,
+            farX: 0,
+            farY: 0,
+            farRotationY: 0,
+            farRotationX: 0,
+            midX: 0,
+            midY: 0,
+            midRotationY: 0,
+            midRotationX: 0,
             charX: 0,
             charY: 0,
             charRotationY: 0,
             charRotationX: 0,
-            bgX: 0,
-            bgY: 0,
-            bgRotationY: 0,
-            bgRotationX: 0
+            frontX: 0,
+            frontY: 0,
+            frontRotationY: 0,
+            frontRotationX: 0
         });
         this.homeDirty = true;
         this.ensureRunning();
@@ -449,6 +644,24 @@ class InteractionEngine {
             z: 0,
             scale: state.bgScale
         });
+        if (cardFarLayer) {
+            gsap.set(cardFarLayer, {
+                xPercent: -50,
+                x: state.farX,
+                y: state.farY,
+                z: state.farZ,
+                scale: state.farScale
+            });
+        }
+        if (cardMidLayer) {
+            gsap.set(cardMidLayer, {
+                xPercent: -50,
+                x: state.midX,
+                y: state.midY,
+                z: state.midZ,
+                scale: state.midScale
+            });
+        }
         gsap.set(cardGlare, {
             x: state.glareX,
             y: state.glareY,
@@ -473,6 +686,17 @@ class InteractionEngine {
                 scale: state.charScale
             });
         }
+        if (cardFrontLayer) {
+            gsap.set(cardFrontLayer, {
+                xPercent: -50,
+                x: state.frontX,
+                y: state.frontY,
+                z: state.frontZ,
+                rotationX: state.frontRotateX,
+                rotationY: state.frontRotateY,
+                scale: state.frontScale
+            });
+        }
         if (taskContentWrap) {
             gsap.set(taskContentWrap, {
                 x: 0,
@@ -486,6 +710,22 @@ class InteractionEngine {
 
     renderHome() {
         const state = this.home.current;
+        if (homeHeroFar) {
+            gsap.set(homeHeroFar, {
+                x: state.farX,
+                y: state.farY,
+                rotationY: state.farRotationY,
+                rotationX: state.farRotationX
+            });
+        }
+        if (homeHeroMid) {
+            gsap.set(homeHeroMid, {
+                x: state.midX,
+                y: state.midY,
+                rotationY: state.midRotationY,
+                rotationX: state.midRotationX
+            });
+        }
         if (homeHeroChar) {
             gsap.set(homeHeroChar, {
                 xPercent: -50,
@@ -501,6 +741,14 @@ class InteractionEngine {
                 y: state.bgY,
                 rotationY: state.bgRotationY,
                 rotationX: state.bgRotationX
+            });
+        }
+        if (homeHeroFront) {
+            gsap.set(homeHeroFront, {
+                x: state.frontX,
+                y: state.frontY,
+                rotationY: state.frontRotationY,
+                rotationX: state.frontRotationX
             });
         }
     }
