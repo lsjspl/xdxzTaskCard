@@ -134,6 +134,7 @@ let gyroPermissionState = 'unknown';
 let gyroListening = false;
 let gyroBaseline = null;
 let gyroFiltered = { dx: 0, dy: 0 };
+let lastSummonTriggerAt = 0;
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const randomChoice = items => items[Math.floor(Math.random() * items.length)];
@@ -1307,6 +1308,78 @@ function createSummonTimeline(context) {
     return timeline;
 }
 
+function forceCompleteSummon(finalRarity) {
+    summonFx.stop();
+    clearSummonScene();
+    resetGyroBaseline();
+    gsap.killTweensOf([cardRevealOverlay, cardStage, theCard, cardInnerWrap, retryBtn, whiteFlash, cardGlare]);
+
+    gsap.set(mainScreen, { opacity: 0, scale: 0.92 });
+    mainScreen.classList.add('fade-out');
+    gsap.set(cardRevealOverlay, { opacity: 1, pointerEvents: "auto" });
+    cardRevealOverlay.classList.add('active');
+    cardRevealOverlay.classList.remove('impacting');
+    cardStage.classList.remove('materializing');
+    cardStage.classList.add('presented');
+    theCard.classList.add('is-flipped');
+
+    gsap.set(cardStage, {
+        xPercent: -50,
+        yPercent: -50,
+        y: 0,
+        scale: 1,
+        rotateX: 0,
+        opacity: 1,
+        filter: "blur(0px)"
+    });
+    gsap.set(theCard, { rotationX: 0, rotationY: 0, rotationZ: 0, z: 0, scale: 1 });
+    gsap.set(cardInnerWrap, { rotationY: 180 });
+    gsap.set(whiteFlash, { opacity: 0 });
+    gsap.set(cardGlare, { x: "100%" });
+    retryBtn.classList.add('active');
+    gsap.set(retryBtn, { autoAlpha: 1, y: 0 });
+
+    if (finalRarity) {
+        revealFx.start(finalRarity, cardStage.getBoundingClientRect());
+    }
+}
+
+function runSummonTimeline(context) {
+    const timeline = createSummonTimeline(context);
+    const timeoutMs = Math.max(Math.round(timeline.totalDuration() * 1000) + 1800, 9000);
+
+    return new Promise((resolve, reject) => {
+        let settled = false;
+        const settle = (fn, value) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timeoutId);
+            fn(value);
+        };
+
+        const timeoutId = setTimeout(() => {
+            console.warn('Summon timeline timed out, forcing final reveal.');
+            try {
+                timeline.kill();
+                forceCompleteSummon(context.finalRarity);
+                settle(resolve);
+            } catch (error) {
+                settle(reject, error);
+            }
+        }, timeoutMs);
+
+        timeline.eventCallback('onComplete', () => settle(resolve));
+        timeline.eventCallback('onInterrupt', () => {
+            try {
+                forceCompleteSummon(context.finalRarity);
+                settle(resolve);
+            } catch (error) {
+                settle(reject, error);
+            }
+        });
+    });
+}
+
 async function collapseReveal() {
     resetRevealScene();
     cardRevealOverlay.classList.remove('active');
@@ -2044,13 +2117,12 @@ async function triggerSummon() {
         const bridgeTargetY = window.innerHeight * 0.46;
         applyDestinySkin(destiny, initialFxRarity);
         if (retrying) await collapseReveal();
-        const mainTl = createSummonTimeline({
+        await runSummonTimeline({
             initialFxRarity,
             finalRarity,
             bridgeTargetX,
             bridgeTargetY
         });
-        await mainTl;
     } catch (error) {
         console.error('终极出卡失败:', error);
         revealFx.stop();
@@ -2064,15 +2136,24 @@ async function triggerSummon() {
 }
 
 function attachInteractions(btn) {
-    btn.addEventListener('click', triggerSummon);
-    // Add aggressive touchend fallback for mobile browsers like Edge Android 
-    // that might cancel native click events during pointermove
-    btn.addEventListener('touchend', (e) => {
-        if (!isSummoning) {
-            e.preventDefault(); // Stop native click from double-firing
-            triggerSummon();
+    const fireSummon = (event) => {
+        const now = Date.now();
+        if (now - lastSummonTriggerAt < 600) {
+            event?.preventDefault?.();
+            return;
         }
-    }, { passive: false });
+
+        lastSummonTriggerAt = now;
+        event?.preventDefault?.();
+        triggerSummon();
+    };
+
+    btn.addEventListener('click', fireSummon);
+    btn.addEventListener('pointerup', event => {
+        if (event.pointerType === 'mouse' && event.button !== 0) return;
+        fireSummon(event);
+    });
+    btn.addEventListener('touchend', fireSummon, { passive: false });
 }
 
 attachInteractions(summonBtn);
