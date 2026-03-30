@@ -1,5 +1,6 @@
 :root {
   --font-display: "Ma Shan Zheng", cursive;
+  --font-logo: "ZCOOL KuaiLe", "Ma Shan Zheng", cursive;
   --font-title: "Noto Serif SC", serif;
   --font-main: "Noto Sans SC", sans-serif;
   --bg-deep: #fdf2d0;
@@ -399,7 +400,7 @@ body.fx-mobile #main-bg-canvas {
 .home-hero-char {
   position: absolute;
   left: 50%;
-  bottom: 180px;
+  bottom: 160px;
   width: 168%;
   height: 60vh;
   transform: translateX(-50%);
@@ -492,6 +493,7 @@ body.fx-mobile #main-bg-canvas {
   align-items: center;
   gap: 14px;
   text-align: center;
+  transform: translateY(-80px);
 }
 
 .eyebrow {
@@ -501,16 +503,16 @@ body.fx-mobile #main-bg-canvas {
 }
 
 .grand-title {
-  font-family: var(--font-display);
-  font-size: clamp(3.6rem, 11vw, 6.4rem);
+  font-family: var(--font-logo);
+  font-size: clamp(6rem, 14vw, 8rem);
   line-height: 1;
   color: #ffffff;
+  letter-spacing: 0.04em;
+  -webkit-text-stroke: 8px #6cc8f2;
+  paint-order: stroke fill;
   text-shadow:
-    4px 4px 0 rgba(75, 50, 42, 0.88),
-    -4px -4px 0 rgba(75, 50, 42, 0.88),
-    4px -4px 0 rgba(75, 50, 42, 0.88),
-    -4px 4px 0 rgba(75, 50, 42, 0.88),
-    0 10px 20px rgba(93, 64, 55, 0.16);
+    0 8px 0 rgba(74, 169, 219, 0.52),
+    0 16px 24px rgba(61, 130, 179, 0.22);
 }
 
 .subtitle {
@@ -549,8 +551,8 @@ body.fx-mobile #main-bg-canvas {
 }
 
 .summon-btn {
-  width: min(360px, calc(100vw - 28px));
-  height: 78px;
+  width: min(332px, calc(100vw - 40px));
+  height: 72px;
   background:
     linear-gradient(180deg, #ffe671 0%, #ffcf1d 100%);
   box-shadow:
@@ -596,7 +598,7 @@ body.fx-mobile #main-bg-canvas {
   justify-content: center;
   width: 100%;
   height: 100%;
-  font-size: 2rem;
+  font-size: 1.82rem;
   letter-spacing: 0.08em;
   color: #5d4037;
 }
@@ -1654,14 +1656,16 @@ body.fx-lite .card-front-layer {
 }
 
 .reveal-grand-title {
-  font-family: var(--font-display);
+  font-family: var(--font-logo);
   font-size: clamp(2.4rem, 10vw, 3.8rem);
   color: #ffffff;
   white-space: nowrap;
+  letter-spacing: 0.03em;
+  -webkit-text-stroke: 5px #6cc8f2;
+  paint-order: stroke fill;
   text-shadow:
-    2px 2px 0 rgba(75, 50, 42, 0.8),
-    -2px -2px 0 rgba(75, 50, 42, 0.8),
-    0 4px 12px rgba(93, 64, 55, 0.18);
+    0 5px 0 rgba(74, 169, 219, 0.48),
+    0 10px 18px rgba(61, 130, 179, 0.2);
 }
 
 @keyframes reveal-title-float {
@@ -2028,7 +2032,7 @@ body.fx-lite .card-front-layer {
   }
 
   .grand-title {
-    font-size: 3.4rem;
+    font-size: 5.2rem;
   }
 
   .subtitle {
@@ -2037,12 +2041,12 @@ body.fx-lite .card-front-layer {
   }
 
   .summon-btn {
-    width: min(320px, calc(100vw - 24px));
-    height: 70px;
+    width: min(296px, calc(100vw - 28px));
+    height: 64px;
   }
 
   .btn-text {
-    font-size: 1.64rem;
+    font-size: 1.46rem;
   }
 
   .retry-btn {
