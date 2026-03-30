@@ -973,15 +973,18 @@ function startGyroTiltListener() {
     if (gyroListening || typeof window === 'undefined' || !('DeviceOrientationEvent' in window)) return false;
     window.addEventListener('deviceorientation', handleGyroOrientation, true);
     gyroListening = true;
-    gyroTiltEnabled = true;
     logTiltDebug('gyro/listening', { permission: gyroPermissionState }, { force: true });
     return true;
+}
+
+function setGyroTiltEnabled(enabled) {
+    gyroTiltEnabled = Boolean(enabled);
+    resetGyroBaseline();
 }
 
 async function ensureGyroTiltAccess() {
     if (typeof window === 'undefined' || !('DeviceOrientationEvent' in window)) return false;
     if (gyroListening) {
-        gyroTiltEnabled = true;
         return true;
     }
 
@@ -1218,7 +1221,7 @@ function addRevealArrivalPhase(timeline, context) {
             cardRevealOverlay.classList.add('active', 'impacting');
             cardStage.classList.add('materializing');
             gsap.set(cardStage, { xPercent: -50, yPercent: -50 });
-            resetGyroBaseline();
+            setGyroTiltEnabled(false);
             logTiltDebug('reveal/activated', {}, { force: true });
         })
         .fromTo(
@@ -1252,7 +1255,7 @@ function addRevealPresentationPhase(timeline, context) {
         .add(() => {
             cardStage.classList.remove('materializing');
             cardStage.classList.add('presented');
-            resetGyroBaseline();
+            setGyroTiltEnabled(true);
             logTiltDebug('reveal/presented', {}, { force: true });
         })
         .add(() => revealFx.start(initialFxRarity, cardStage.getBoundingClientRect()))
@@ -1311,6 +1314,7 @@ function createSummonTimeline(context) {
 function forceCompleteSummon(finalRarity) {
     summonFx.stop();
     clearSummonScene();
+    setGyroTiltEnabled(true);
     resetGyroBaseline();
     gsap.killTweensOf([cardRevealOverlay, cardStage, theCard, cardInnerWrap, retryBtn, whiteFlash, cardGlare]);
 
@@ -1392,6 +1396,9 @@ function closeReveal() {
     cardRevealOverlay.classList.remove('active');
     setTimeout(() => {
         mainScreen.classList.remove('fade-out');
+        if (gyroPermissionState === 'granted') {
+            setGyroTiltEnabled(true);
+        }
     }, 260);
 }
 
@@ -2108,6 +2115,7 @@ async function triggerSummon() {
     if (isSummoning) return;
     isSummoning = true;
     try {
+        setGyroTiltEnabled(false);
         await ensureGyroTiltAccess();
         const destiny = drawDestiny();
         const finalRarity = destiny.rarity;
